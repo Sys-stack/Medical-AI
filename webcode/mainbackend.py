@@ -13,7 +13,7 @@ app.config['DEBUG'] = True
 # Home route
 @app.route('/')
 def home():
-    return "Hello, Flask is running!"
+    return render_template("homepage.html")
 
 # Example route with GET and POST
 @app.route('/api/data', methods=['GET', 'POST'])
