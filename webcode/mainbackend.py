@@ -3,11 +3,12 @@
 # Run: python mainbackend.py
 # =============================================================
 import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, render_template, request, jsonify
 from classes import convoHistory, get_sorted_history, lookup_convos, build_timeline
 from functions import data_fetch
-import os
+
 
 # ── In-memory conversation store ──────────────────────────────
 # Key   : convo.id
