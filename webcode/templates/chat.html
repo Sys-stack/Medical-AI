@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <!--
-  templates/chat.html
-  Cura — Dedicated Chat Page
-  Pure UI: no processing logic. Only animations + an empty fetch stub.
-  Add your Flask route:  @app.route("/chat-page") → render_template("chat.html")
+  templates/chat.html — Cura Dedicated Chat Page
+  ─────────────────────────────────────────────
+  UI only. Zero business logic.
+  All backend hooks are marked with  ── BACKEND HOOK ──  comments.
+
+  Flask routes needed (implement in app.py):
+    GET  /chat-page              → render_template("chat.html")
+    POST /chat                   → receives { message }, returns { response, convo_id }
+    GET  /history                → returns { conversations: [ { id, date, title, prompt } ] }
+    POST /compare                → receives { ids: [id, id, ...] }, returns { report: "..." }
 -->
 <html lang="en">
 <head>
@@ -13,224 +19,491 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
 </head>
 
-<!-- chat-page-body locks the viewport so the chat fills the full screen -->
 <body class="chat-page-body">
 
   <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
   <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
 
-  <!-- ════════════════════════════════════════
+  <!-- ══════════════════════════════════════════════════════════
        NAVBAR
-  ════════════════════════════════════════ -->
+  ══════════════════════════════════════════════════════════ -->
   <header class="navbar" id="navbar">
     <div class="container">
+
+      <!-- Sidebar toggle button (always visible) -->
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Toggle history sidebar" aria-expanded="true">
+        <span class="stb-bar"></span>
+        <span class="stb-bar"></span>
+        <span class="stb-bar stb-bar--short"></span>
+      </button>
+
       <a href="/" class="nav-logo">Cura<span class="accent-dot">.</span></a>
+
       <nav>
         <ul class="nav-links" id="nav-links">
           <li><a href="/">Home</a></li>
           <li><a href="/chat-page">Chat</a></li>
         </ul>
       </nav>
-      <button
-        class="nav-toggle" id="nav-toggle"
-        aria-label="Toggle navigation" aria-expanded="false"
-      >
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
+
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
+
     </div>
   </header>
 
-  <!-- ════════════════════════════════════════
-       MAIN — sidebar + chat card fill the screen
-  ════════════════════════════════════════ -->
-  <main class="chat-page-main">
 
-    <!-- Sidebar (visible ≥ 1100px) -->
-    <aside class="chat-sidebar">
+  <!-- ══════════════════════════════════════════════════════════
+       APP SHELL — history sidebar + chat area side by side
+  ══════════════════════════════════════════════════════════ -->
+  <div class="app-shell" id="app-shell">
 
-      <a href="/" class="sidebar-logo">Cura<span class="accent-dot">.</span></a>
+    <!-- ─────────────────────────────────────────────────────
+         HISTORY SIDEBAR (collapsible)
+         Data is populated from Python via /history endpoint.
+    ───────────────────────────────────────────────────────── -->
+    <aside class="history-sidebar" id="history-sidebar" aria-label="Conversation history">
 
-      <div>
-        <p class="sidebar-label">About</p>
-        <p class="sidebar-desc">
-          Your personal AI care assistant — ask about symptoms,
-          appointments, or general wellbeing.
-        </p>
+      <!-- Sidebar header -->
+      <div class="hs-header">
+        <span class="hs-title">History</span>
+        <a href="/chat-page" class="hs-new-btn" title="New conversation">＋</a>
       </div>
 
-      <div class="sidebar-divider"></div>
-
-      <div class="sidebar-tags">
-        <p class="sidebar-label">Capabilities</p>
-        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Symptom guidance</div>
-        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Appointment scheduling</div>
-        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Medication queries</div>
-        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Wellness advice</div>
-        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Care navigation</div>
-      </div>
-
-      <div class="sidebar-divider"></div>
-
-      <p class="sidebar-desc" style="font-size:0.72rem;">
-        Cura does not replace professional medical advice.
-        Always consult a qualified clinician for diagnosis.
-      </p>
-
-    </aside>
-
-    <!-- Chat card -->
-    <div class="chat-card" role="region" aria-label="Chat with Cura">
-
-      <!-- Card header -->
-      <div class="chat-header">
-        <div class="chat-header-left">
-          <span class="chat-status" aria-label="Online"></span>
-          <span class="chat-title">Cura Assistant</span>
-        </div>
-        <span class="chat-header-right">Powered by AI</span>
-      </div>
-
-      <!-- Messages -->
-      <div
-        class="chat-messages"
-        id="chat-messages"
-        role="log"
-        aria-live="polite"
-        aria-label="Conversation"
-      >
-        <!-- Greeting bubble -->
-        <div class="msg ai">
-          <div class="msg-avatar" aria-hidden="true">✦</div>
-          <div class="msg-bubble">
-            Hello! I'm Cura, your personal AI care assistant.
-            How are you feeling today, and how can I help?
-          </div>
-        </div>
-      </div>
-
-      <!-- Input row -->
-      <div class="chat-input-area">
-        <label for="chat-input" class="sr-only">Your message</label>
-        <input
-          type="text"
-          id="chat-input"
-          class="chat-input"
-          placeholder="Type your message…"
-          autocomplete="off"
-          maxlength="500"
-        />
-        <button id="send-btn" class="send-btn" aria-label="Send message">
-          &#10148;
+      <!-- Compare bar — appears when ≥ 2 convos are checked -->
+      <div class="hs-compare-bar" id="compare-bar" hidden>
+        <span class="hs-compare-count" id="compare-count">0 selected</span>
+        <button class="hs-compare-btn" id="compare-btn" disabled>
+          Compare health →
         </button>
       </div>
 
-    </div><!-- /chat-card -->
+      <!-- ── BACKEND HOOK ────────────────────────────────────
+           Conversation list is rendered here.
 
-  </main>
+           In Flask:
+             - Add route  GET /history
+             - Query your storage (DB / file / dict) for all
+               past conversations belonging to this user/session
+             - Return JSON:
+               {
+                 "conversations": [
+                   {
+                     "id":     "uuid-or-int",
+                     "date":   "22 Mar 2026",
+                     "title":  "Headache & fatigue",   ← first few words of prompt
+                     "prompt": "Full original prompt text"
+                   },
+                   ...
+                 ]
+               }
 
-  <!-- Bottom disclaimer bar -->
+           In JavaScript (loadHistory below):
+             - fetch('/history') and call renderHistory(data.conversations)
+             - Each item gets a checkbox + click handler
+           ──────────────────────────────────────────────────── -->
+      <ul class="hs-list" id="hs-list" role="list">
+        <!-- Populated by loadHistory() at runtime -->
+
+        <!-- Static placeholder items (remove once backend is wired) -->
+        <li class="hs-item hs-item--placeholder">
+          <span class="hs-item-icon">💬</span>
+          <span class="hs-item-text">Loading history…</span>
+        </li>
+      </ul>
+
+      <!-- Sidebar footer -->
+      <div class="hs-footer">
+        <p class="hs-footer-note">Select 2+ conversations<br />to compare health progress</p>
+      </div>
+
+    </aside><!-- /history-sidebar -->
+
+
+    <!-- ─────────────────────────────────────────────────────
+         CHAT AREA
+    ───────────────────────────────────────────────────────── -->
+    <main class="chat-page-main" id="chat-main">
+
+      <!-- Chat card -->
+      <div class="chat-card" role="region" aria-label="Chat with Cura">
+
+        <!-- Card header -->
+        <div class="chat-header">
+          <div class="chat-header-left">
+            <span class="chat-status" aria-label="Online"></span>
+            <span class="chat-title">Cura Assistant</span>
+          </div>
+          <span class="chat-header-right">Powered by AI</span>
+        </div>
+
+        <!-- Messages — hidden until user sends -->
+        <div class="chat-messages" id="chat-messages" role="log" aria-live="polite"></div>
+
+        <!-- ── COMPARE REPORT PANEL ────────────────────────
+             Shown instead of normal messages when the user
+             triggers a health-progress comparison.
+
+             BACKEND HOOK:
+               POST /compare
+               Body:   { "ids": ["id1", "id2", ...] }
+               Return: { "report": "Markdown or plain-text analysis" }
+
+             In JavaScript (runCompare below):
+               - Collect checked convo ids
+               - POST to /compare
+               - Render data.report inside #compare-report-body
+        ─────────────────────────────────────────────────── -->
+        <div class="compare-panel" id="compare-panel" hidden>
+          <div class="compare-panel-header">
+            <span class="compare-panel-icon">✦</span>
+            <div>
+              <p class="compare-panel-eyebrow">Health Progress Analysis</p>
+              <p class="compare-panel-sub">Comparing selected conversations</p>
+            </div>
+            <button class="compare-panel-close" id="compare-panel-close" aria-label="Close comparison">✕</button>
+          </div>
+          <!-- Report text injected here by runCompare() -->
+          <div class="compare-report-body" id="compare-report-body">
+            <div class="typing compare-typing">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single-prompt input — centred on load, locks after send -->
+        <div class="chat-input-area" id="input-area">
+
+          <div class="input-prompt" id="input-prompt">
+            <p class="input-prompt-eyebrow">Ask Cura anything</p>
+            <h2 class="input-prompt-headline">What can I help you <em>with?</em></h2>
+            <p class="input-prompt-sub">Type your question below — you'll receive a personalised response.</p>
+          </div>
+
+          <div class="input-row">
+            <label for="chat-input" class="sr-only">Your message</label>
+            <input
+              type="text"
+              id="chat-input"
+              class="chat-input"
+              placeholder="Describe your symptoms or ask a question…"
+              autocomplete="off"
+              maxlength="500"
+            />
+            <button id="send-btn" class="send-btn" aria-label="Send message">&#10148;</button>
+          </div>
+
+        </div>
+
+        <!-- Shown after response received — replaces input -->
+        <div class="chat-done" id="chat-done" hidden>
+          <span class="chat-done-icon">✦</span>
+          <p class="chat-done-text">Response complete</p>
+          <a href="/chat-page" class="chat-done-link">Ask another question →</a>
+        </div>
+
+      </div><!-- /chat-card -->
+
+    </main><!-- /chat-page-main -->
+
+  </div><!-- /app-shell -->
+
+
+  <!-- Bottom disclaimer -->
   <div class="chat-page-hint">
     Cura is an AI assistant · Responses are not medical advice · &copy; <span id="year"></span> Cura
   </div>
 
-  <!-- ════════════════════════════════════════
-       SCRIPT
-       — Navbar + mobile nav animations only
-       — appendMessage / showTyping for bubble animations
-       — sendMessage has an EMPTY fetch stub;
-         plug your Flask /chat endpoint logic inside it
-  ════════════════════════════════════════ -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       SCRIPT — UI & animations only. No logic.
+       All backend hooks are marked with BACKEND HOOK comments.
+  ══════════════════════════════════════════════════════════ -->
   <script>
-    /* ── Misc ── */
+    /* ── Misc ──────────────────────────────────────────────── */
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    /* ── Navbar: compact on scroll ── */
-    const navbar = document.getElementById('navbar');
+    /* ── DOM refs ───────────────────────────────────────────── */
+    const navbar          = document.getElementById('navbar');
+    const navToggle       = document.getElementById('nav-toggle');
+    const navLinks        = document.getElementById('nav-links');
+    const appShell        = document.getElementById('app-shell');
+    const historySidebar  = document.getElementById('history-sidebar');
+    const sidebarToggle   = document.getElementById('sidebar-toggle-btn');
+    const hsList          = document.getElementById('hs-list');
+    const compareBar      = document.getElementById('compare-bar');
+    const compareCount    = document.getElementById('compare-count');
+    const compareBtn      = document.getElementById('compare-btn');
+    const messages        = document.getElementById('chat-messages');
+    const inputArea       = document.getElementById('input-area');
+    const chatInput       = document.getElementById('chat-input');
+    const sendBtn         = document.getElementById('send-btn');
+    const chatDone        = document.getElementById('chat-done');
+    const comparePanel    = document.getElementById('compare-panel');
+    const compareBody     = document.getElementById('compare-report-body');
+    const comparePanelClose = document.getElementById('compare-panel-close');
+
+    /* ── Navbar shrink on scroll ────────────────────────────── */
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 20);
     }, { passive: true });
 
-    /* ── Mobile nav toggle ── */
-    const navToggle = document.getElementById('nav-toggle');
-    const navLinks  = document.getElementById('nav-links');
+    /* ── Mobile nav ─────────────────────────────────────────── */
     navToggle.addEventListener('click', () => {
       const open = navLinks.classList.toggle('open');
       navToggle.classList.toggle('open', open);
       navToggle.setAttribute('aria-expanded', String(open));
     });
 
-    /* ── DOM refs ── */
-    const messages  = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn   = document.getElementById('send-btn');
+    /* ════════════════════════════════════════════════════════
+       SIDEBAR COLLAPSE / EXPAND
+    ════════════════════════════════════════════════════════ */
+    let sidebarOpen = true;
 
-    /* ── UI animations ── */
+    function setSidebar(open) {
+      sidebarOpen = open;
+      appShell.classList.toggle('sidebar-collapsed', !open);
+      sidebarToggle.setAttribute('aria-expanded', String(open));
+      /* Persist preference so it survives page reload */
+      sessionStorage.setItem('cura_sidebar', open ? '1' : '0');
+    }
 
-    /** Append a styled bubble and animate it in */
+    /* Restore saved preference */
+    if (sessionStorage.getItem('cura_sidebar') === '0') setSidebar(false);
+
+    sidebarToggle.addEventListener('click', () => setSidebar(!sidebarOpen));
+
+
+    /* ════════════════════════════════════════════════════════
+       HISTORY — load past conversations from Flask
+       ════════════════════════════════════════════════════════
+
+       ── BACKEND HOOK ──────────────────────────────────────
+       Flask route:  GET /history
+       Expected response:
+         {
+           "conversations": [
+             { "id": "abc1", "date": "22 Mar 2026", "title": "Headache & fatigue", "prompt": "..." },
+             { "id": "abc2", "date": "21 Mar 2026", "title": "Back pain query",    "prompt": "..." }
+           ]
+         }
+
+       Storage layer (implement in app.py / a models file):
+         - Store each conversation when POST /chat is called
+         - Suggested structure: a list/dict in memory, or SQLite, or JSON file
+         - Each entry should contain: id, timestamp, user prompt, AI response
+       ──────────────────────────────────────────────────── */
+    async function loadHistory() {
+      /*
+       * UNCOMMENT and wire up once Flask /history is ready:
+       *
+       * try {
+       *   const res  = await fetch('/history');
+       *   const data = await res.json();
+       *   renderHistory(data.conversations);
+       * } catch (err) {
+       *   hsList.innerHTML = '<li class="hs-item hs-item--empty">Could not load history.</li>';
+       * }
+       */
+
+      /* ── PLACEHOLDER: remove this block when backend is live ── */
+      renderHistory([
+        { id: 'demo1', date: '22 Mar 2026', title: 'Headache & fatigue',   prompt: 'I have had a headache and feel tired.' },
+        { id: 'demo2', date: '21 Mar 2026', title: 'Lower back pain',       prompt: 'My lower back has been aching for 3 days.' },
+        { id: 'demo3', date: '19 Mar 2026', title: 'Sleep difficulties',    prompt: 'I cannot sleep more than 4 hours.' },
+        { id: 'demo4', date: '17 Mar 2026', title: 'Fever and sore throat', prompt: 'Feeling hot and throat is very sore.' },
+      ]);
+      /* ────────────────────────────────────────────────────────── */
+    }
+
+    /* ── Render conversation list items ──────────────────────── */
+    function renderHistory(convos) {
+      if (!convos || convos.length === 0) {
+        hsList.innerHTML = '<li class="hs-item hs-item--empty">No past conversations yet.</li>';
+        return;
+      }
+
+      hsList.innerHTML = '';
+
+      convos.forEach(convo => {
+        const li = document.createElement('li');
+        li.className = 'hs-item';
+        li.dataset.id = convo.id;
+        li.innerHTML = `
+          <label class="hs-item-label" title="${convo.prompt}">
+            <input type="checkbox" class="hs-checkbox" data-id="${convo.id}" />
+            <span class="hs-check-box" aria-hidden="true"></span>
+            <span class="hs-item-body">
+              <span class="hs-item-title">${convo.title}</span>
+              <span class="hs-item-date">${convo.date}</span>
+            </span>
+          </label>`;
+        hsList.appendChild(li);
+      });
+
+      /* Attach checkbox listeners after rendering */
+      hsList.querySelectorAll('.hs-checkbox').forEach(cb => {
+        cb.addEventListener('change', onCheckboxChange);
+      });
+    }
+
+    /* ── Track selected conversations for comparison ─────────── */
+    function onCheckboxChange() {
+      const checked = [...hsList.querySelectorAll('.hs-checkbox:checked')];
+      const count   = checked.length;
+
+      /* Toggle the compare action bar */
+      compareBar.hidden  = count < 2;
+      compareBtn.disabled = count < 2;
+      compareCount.textContent = `${count} selected`;
+
+      /* Highlight checked items */
+      hsList.querySelectorAll('.hs-item').forEach(li => {
+        const cb = li.querySelector('.hs-checkbox');
+        li.classList.toggle('hs-item--checked', cb && cb.checked);
+      });
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       COMPARE — send selected convo ids to Flask for analysis
+       ════════════════════════════════════════════════════════
+
+       ── BACKEND HOOK ──────────────────────────────────────
+       Flask route:  POST /compare
+       Request body: { "ids": ["abc1", "abc2", ...] }
+
+       What Flask should do:
+         1. Look up each conversation by id in your storage
+         2. Extract the user prompts (and optionally AI responses)
+         3. Send them to your AI/LLM with a prompt such as:
+              "Given these health queries over time, analyse the
+               progression and summarise improvements or concerns."
+         4. Return: { "report": "<plain text or markdown analysis>" }
+
+       Expected response shape:
+         {
+           "report": "Based on your conversations from Mar 17–22,
+                      your fatigue appears to have improved, however
+                      the recurring back pain suggests..."
+         }
+       ──────────────────────────────────────────────────── */
+    async function runCompare() {
+      const selectedIds = [...hsList.querySelectorAll('.hs-checkbox:checked')]
+                            .map(cb => cb.dataset.id);
+
+      if (selectedIds.length < 2) return;
+
+      /* Show compare panel with loading state */
+      comparePanel.hidden = false;
+      compareBody.innerHTML = `
+        <div class="typing compare-typing">
+          <span></span><span></span><span></span>
+        </div>`;
+
+      /* Scroll chat area to show panel */
+      comparePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      /*
+       * UNCOMMENT and wire up once Flask /compare is ready:
+       *
+       * try {
+       *   const res  = await fetch('/compare', {
+       *     method:  'POST',
+       *     headers: { 'Content-Type': 'application/json' },
+       *     body:    JSON.stringify({ ids: selectedIds }),
+       *   });
+       *   const data = await res.json();
+       *   compareBody.textContent = data.report;
+       * } catch (err) {
+       *   compareBody.textContent = 'Could not load comparison. Please try again.';
+       * }
+       */
+    }
+
+    /* Compare button click */
+    compareBtn.addEventListener('click', runCompare);
+
+    /* Close compare panel */
+    comparePanelClose.addEventListener('click', () => {
+      comparePanel.hidden = true;
+      compareBody.innerHTML = '';
+    });
+
+
+    /* ════════════════════════════════════════════════════════
+       CHAT — single-prompt send
+    ════════════════════════════════════════════════════════ */
+
     function appendMessage(text, role) {
-      const row = document.createElement('div');
+      const row    = document.createElement('div');
       row.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
-
-      const avatar = document.createElement('div');
+      const avatar  = document.createElement('div');
       avatar.className = 'msg-avatar';
       avatar.setAttribute('aria-hidden', 'true');
       avatar.textContent = role === 'user' ? '👤' : '✦';
-
-      const bubble = document.createElement('div');
+      const bubble  = document.createElement('div');
       bubble.className = 'msg-bubble';
       bubble.textContent = text;
-
       row.append(avatar, bubble);
       messages.appendChild(row);
       messages.scrollTop = messages.scrollHeight;
     }
 
-    /** Show three-dot typing indicator */
     function showTyping() {
       const row = document.createElement('div');
-      row.className = 'msg ai';
-      row.id = 'typing-indicator';
-      row.innerHTML = `
-        <div class="msg-avatar" aria-hidden="true">✦</div>
-        <div class="typing">
-          <span></span><span></span><span></span>
-        </div>`;
+      row.className = 'msg ai'; row.id = 'typing-indicator';
+      row.innerHTML = `<div class="msg-avatar" aria-hidden="true">✦</div>
+        <div class="typing"><span></span><span></span><span></span></div>`;
       messages.appendChild(row);
       messages.scrollTop = messages.scrollHeight;
     }
 
-    /** Remove typing indicator */
-    function hideTyping() {
-      document.getElementById('typing-indicator')?.remove();
+    function hideTyping() { document.getElementById('typing-indicator')?.remove(); }
+
+    function transitionTo(state) {
+      if (state === 'sent') {
+        inputArea.classList.add('sent');
+        messages.classList.add('visible');
+        chatInput.disabled = sendBtn.disabled = true;
+        sendBtn.textContent = '…';
+      }
+      if (state === 'done') {
+        inputArea.classList.add('hidden-out');
+        chatDone.hidden = false;
+        chatDone.classList.add('visible');
+        /* ── BACKEND HOOK ─────────────────────────────────────
+           After a successful response, save the conversation.
+           Call  POST /save  (or handle inside POST /chat) with:
+             { "prompt": userText, "response": aiReply }
+           Then reload history panel:  loadHistory();
+        ──────────────────────────────────────────────────── */
+      }
     }
 
-    /** Lock / unlock input while waiting for a response */
-    function setLoading(on) {
-      sendBtn.disabled   = on;
-      chatInput.disabled = on;
-      sendBtn.textContent = on ? '…' : '➤';
-    }
+    /* ── BACKEND HOOK ─────────────────────────────────────────
+       Flask route:  POST /chat
+       Request:      { "message": "<user text>" }
+       Response:     { "response": "<AI reply>", "convo_id": "abc3" }
 
-    /* ════════════════════════════════════════
-       FETCH STUB — wire up your Flask backend here.
-       Replace the comment block inside the try{}
-       with your actual fetch() call to /chat.
-    ════════════════════════════════════════ */
+       After receiving response:
+         - hideTyping()
+         - appendMessage(data.response, 'ai')
+         - Optionally store convo_id to highlight in sidebar
+         - Call loadHistory() to refresh the sidebar list
+    ────────────────────────────────────────────────────────── */
     async function sendMessage() {
       const text = chatInput.value.trim();
       if (!text) return;
 
-      /* Render user bubble */
+      transitionTo('sent');
       appendMessage(text, 'user');
-      chatInput.value = '';
-      setLoading(true);
       showTyping();
 
       try {
-
-        /* ── YOUR FETCH GOES HERE ──────────────────
+        /*
+         * UNCOMMENT when Flask /chat is ready:
          *
          * const res  = await fetch('/chat', {
          *   method:  'POST',
@@ -240,28 +513,23 @@
          * const data = await res.json();
          * hideTyping();
          * appendMessage(data.response, 'ai');
-         *
-         * ─────────────────────────────────────── */
-
+         * loadHistory();   ← refresh sidebar with new entry
+         */
       } catch (err) {
         hideTyping();
-        /* Optionally surface an error bubble:
-         * appendMessage('Something went wrong. Please try again.', 'ai');
-         */
+        /* appendMessage('Something went wrong. Please try again.', 'ai'); */
       } finally {
-        setLoading(false);
-        chatInput.focus();
+        transitionTo('done');
       }
     }
 
-    /* ── Event listeners ── */
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
+
+    /* ── Kick off history load on page ready ────────────────── */
+    loadHistory();
   </script>
 
 </body>
