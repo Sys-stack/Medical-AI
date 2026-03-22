@@ -1,46 +1,21 @@
 <!DOCTYPE html>
-<!--
-  templates/homepage.html
-  Cura — AI-Powered Care, Simplified
-  Flask template served via app.py
-  Chat messages POST to FastAPI at http://localhost:8000/chat
--->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Cura — AI-powered healthcare assistance, simplified." />
   <title>Cura — AI-Powered Care</title>
-
-  <!-- Favicon placeholder -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>" />
-
-  <!-- Stylesheet (Flask url_for) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
 </head>
-
 <body>
 
-  <!-- ══════════════════════════════════════════════
-       AMBIENT BACKGROUND ORBS
-  ══════════════════════════════════════════════ -->
   <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
   <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
 
-
-  <!-- ══════════════════════════════════════════════
-       NAVBAR
-  ══════════════════════════════════════════════ -->
-  <header class="navbar" id="navbar" role="banner">
+  <!-- ── NAVBAR ── -->
+  <header class="navbar" id="navbar">
     <div class="container">
-
-      <!-- Logo -->
-      <a href="/" class="nav-logo" aria-label="Cura home">
-        Cura<span class="accent-dot">.</span>
-      </a>
-
-      <!-- Desktop nav links -->
-      <nav aria-label="Primary navigation">
+      <a href="/" class="nav-logo">Cura<span class="accent-dot">.</span></a>
+      <nav>
         <ul class="nav-links" id="nav-links">
           <li><a href="#home">Home</a></li>
           <li><a href="#about">About</a></li>
@@ -48,55 +23,30 @@
           <li><a href="#contact">Contact</a></li>
         </ul>
       </nav>
-
-      <!-- Mobile hamburger -->
-      <button
-        class="nav-toggle"
-        id="nav-toggle"
-        aria-label="Toggle navigation"
-        aria-expanded="false"
-        aria-controls="nav-links"
-      >
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
-
     </div>
   </header>
 
-
-  <!-- ══════════════════════════════════════════════
-       HERO SECTION
-  ══════════════════════════════════════════════ -->
   <main>
-    <section class="hero" id="home" aria-labelledby="hero-heading">
+
+    <!-- ── HERO ── -->
+    <section class="hero" id="home">
       <div class="container">
         <div class="hero-inner">
-
-          <!-- Copy -->
           <div class="hero-content">
             <p class="hero-eyebrow">Healthcare, reimagined</p>
-
-            <h1 class="hero-headline" id="hero-heading">
-              AI-Powered Care,<br /><em>Simplified</em>
-            </h1>
-
+            <h1 class="hero-headline">AI-Powered Care,<br /><em>Simplified</em></h1>
             <p class="hero-sub">
               Cura brings intelligent, compassionate assistance to every step
               of your healthcare journey — available anytime, wherever you are.
             </p>
-
             <div class="hero-cta">
-              <a href="#chat" class="btn-primary">
-                Start a conversation
-                <span class="icon" aria-hidden="true">→</span>
-              </a>
+              <a href="#chat" class="btn-primary">Start a conversation <span class="icon">→</span></a>
               <a href="#about" class="btn-ghost">Learn more</a>
             </div>
           </div>
-
-          <!-- Decorative stat badge -->
           <div class="hero-badge" aria-hidden="true">
             <div class="badge-ring">
               <div class="badge-inner">
@@ -105,370 +55,176 @@
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </section>
 
-
-    <!-- ══════════════════════════════════════════════
-         FEATURE STRIP
-    ══════════════════════════════════════════════ -->
-    <section class="strip" aria-label="Key features" id="about">
+    <!-- ── FEATURE STRIP ── -->
+    <section class="strip" id="about">
       <div class="container">
-
-        <div class="strip-item">
-          <div class="strip-icon" aria-hidden="true">🔒</div>
-          <div class="strip-text">
-            <strong>Private &amp; Secure</strong>
-            <span>End-to-end encrypted</span>
-          </div>
-        </div>
-
-        <div class="strip-item">
-          <div class="strip-icon" aria-hidden="true">⚡</div>
-          <div class="strip-text">
-            <strong>Instant Responses</strong>
-            <span>Sub-second latency</span>
-          </div>
-        </div>
-
-        <div class="strip-item">
-          <div class="strip-icon" aria-hidden="true">🩺</div>
-          <div class="strip-text">
-            <strong>Clinically Informed</strong>
-            <span>Evidence-based guidance</span>
-          </div>
-        </div>
-
-        <div class="strip-item">
-          <div class="strip-icon" aria-hidden="true">🌐</div>
-          <div class="strip-text">
-            <strong>Always Available</strong>
-            <span>24 / 7 assistance</span>
-          </div>
-        </div>
-
+        <div class="strip-item"><div class="strip-icon">🔒</div><div class="strip-text"><strong>Private &amp; Secure</strong><span>End-to-end encrypted</span></div></div>
+        <div class="strip-item"><div class="strip-icon">⚡</div><div class="strip-text"><strong>Instant Responses</strong><span>Sub-second latency</span></div></div>
+        <div class="strip-item"><div class="strip-icon">🩺</div><div class="strip-text"><strong>Clinically Informed</strong><span>Evidence-based guidance</span></div></div>
+        <div class="strip-item"><div class="strip-icon">🌐</div><div class="strip-text"><strong>Always Available</strong><span>24 / 7 assistance</span></div></div>
       </div>
     </section>
 
-
-    <!-- ══════════════════════════════════════════════
-         CHAT SECTION
-    ══════════════════════════════════════════════ -->
-    <section class="chat-section" id="chat" aria-labelledby="chat-heading">
+    <!-- ── CHAT ── -->
+    <section class="chat-section" id="chat">
       <div class="container">
-
-        <!-- Section heading -->
         <div class="section-head">
           <p class="section-eyebrow">Your care assistant</p>
-          <h2 id="chat-heading">Talk to <em>Cura</em></h2>
-          <p>
-            Ask anything about your symptoms, appointments,
-            or general wellbeing. Cura listens carefully.
-          </p>
+          <h2>Talk to <em>Cura</em></h2>
+          <p>Ask anything about your symptoms, appointments, or general wellbeing.</p>
         </div>
 
-        <!-- ── Chat card ── -->
-        <div class="chat-card" role="region" aria-label="Chat with Cura">
-
-          <!-- Card header -->
+        <div class="chat-card">
           <div class="chat-header">
             <div class="chat-header-left">
-              <span class="chat-status" aria-label="Online"></span>
+              <span class="chat-status"></span>
               <span class="chat-title">Cura Assistant</span>
             </div>
             <span class="chat-header-right">Powered by AI</span>
           </div>
 
-          <!-- Messages container -->
-          <div
-            class="chat-messages"
-            id="chat-messages"
-            role="log"
-            aria-live="polite"
-            aria-label="Conversation"
-          >
-            <!-- Initial greeting from Cura -->
-            <div class="msg ai" id="welcome-msg">
+          <div class="chat-messages" id="chat-messages" role="log" aria-live="polite">
+            <div class="msg ai">
               <div class="msg-avatar" aria-hidden="true">✦</div>
-              <div class="msg-bubble">
-                Hello! I'm Cura, your personal AI care assistant.
-                How are you feeling today, and how can I help?
-              </div>
+              <div class="msg-bubble">Hello! I'm Cura, your personal AI care assistant. How are you feeling today?</div>
             </div>
-          </div><!-- /chat-messages -->
-
-          <!-- Input area -->
-          <div class="chat-input-area">
-            <label for="chat-input" class="sr-only">Your message</label>
-            <input
-              type="text"
-              id="chat-input"
-              class="chat-input"
-              placeholder="Describe your symptoms or ask a question…"
-              autocomplete="off"
-              maxlength="500"
-              aria-label="Message input"
-            />
-            <button
-              id="send-btn"
-              class="send-btn"
-              aria-label="Send message"
-              title="Send"
-            >
-              &#10148;
-            </button>
           </div>
 
-          <!-- Hint -->
-          <p class="chat-hint">
-            Cura is an AI assistant and does not replace professional medical advice.
-          </p>
+          <div class="chat-input-area">
+            <input
+              type="text" id="chat-input" class="chat-input"
+              placeholder="Describe your symptoms or ask a question…"
+              autocomplete="off" maxlength="500"
+            />
+            <button id="send-btn" class="send-btn" aria-label="Send">&#10148;</button>
+          </div>
 
-        </div><!-- /chat-card -->
+          <p class="chat-hint">Cura is an AI assistant and does not replace professional medical advice.</p>
+        </div>
 
       </div>
     </section>
 
   </main>
 
-
-  <!-- ══════════════════════════════════════════════
-       FOOTER
-  ══════════════════════════════════════════════ -->
-  <footer class="footer" id="contact" role="contentinfo">
+  <!-- ── FOOTER ── -->
+  <footer class="footer" id="contact">
     <div class="container">
-
-      <a href="/" class="footer-logo">
-        Cura<span class="accent-dot">.</span>
-      </a>
-
-      <p class="footer-copy">
-        &copy; <span id="year"></span> Cura. All rights reserved.
-      </p>
-
-      <nav aria-label="Footer navigation">
-        <ul class="footer-links">
-          <li><a href="#home">Home</a></li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#chat">Chat</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
-      </nav>
-
+      <a href="/" class="footer-logo">Cura<span class="accent-dot">.</span></a>
+      <p class="footer-copy">&copy; <span id="year"></span> Cura. All rights reserved.</p>
+      <ul class="footer-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#chat">Chat</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
     </div>
   </footer>
 
-
-  <!-- ══════════════════════════════════════════════
-       JAVASCRIPT
-       - Navbar scroll effect
-       - Mobile menu toggle
-       - Chat UI + FastAPI fetch integration
-  ══════════════════════════════════════════════ -->
   <script>
-    /* ──────────────────────────────────────────
-       Configuration
-    ────────────────────────────────────────── */
-    const API_URL = 'http://localhost:8000/chat';   // FastAPI endpoint
-
-    /* ──────────────────────────────────────────
-       Footer year
-    ────────────────────────────────────────── */
+    /* ── Misc ── */
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    /* ──────────────────────────────────────────
-       Navbar: shrink on scroll
-    ────────────────────────────────────────── */
+    /* ── Navbar shrink on scroll ── */
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 40);
     }, { passive: true });
 
-    /* ──────────────────────────────────────────
-       Mobile navigation toggle
-    ────────────────────────────────────────── */
-    const navToggle  = document.getElementById('nav-toggle');
-    const navLinks   = document.getElementById('nav-links');
-
+    /* ── Mobile nav ── */
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks  = document.getElementById('nav-links');
     navToggle.addEventListener('click', () => {
-      const isOpen = navLinks.classList.toggle('open');
-      navToggle.classList.toggle('open', isOpen);
-      navToggle.setAttribute('aria-expanded', String(isOpen));
+      const open = navLinks.classList.toggle('open');
+      navToggle.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
     });
-
-    // Close mobile nav when a link is clicked
-    navLinks.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', () => {
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
         navLinks.classList.remove('open');
         navToggle.classList.remove('open');
         navToggle.setAttribute('aria-expanded', 'false');
       });
     });
 
-    /* ──────────────────────────────────────────
-       Chat UI helpers
-    ────────────────────────────────────────── */
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInput    = document.getElementById('chat-input');
-    const sendBtn      = document.getElementById('send-btn');
+    /* ── Chat helpers ── */
+    const messages  = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn   = document.getElementById('send-btn');
 
-    /**
-     * Scroll the message window to the bottom.
-     */
-    function scrollToBottom() {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    /**
-     * Append a message bubble to the chat window.
-     * @param {string} text    - Message content
-     * @param {'ai'|'user'|'error'} role - Sender role
-     * @returns {HTMLElement}  - The created .msg element
-     */
     function appendMessage(text, role) {
-      const isUser  = role === 'user';
-      const isError = role === 'error';
-
-      const msgEl = document.createElement('div');
-      msgEl.classList.add('msg', isUser ? 'user' : 'ai');
-      if (isError) msgEl.classList.add('msg-error');
-
-      // Avatar
-      const avatar = document.createElement('div');
-      avatar.classList.add('msg-avatar');
-      avatar.setAttribute('aria-hidden', 'true');
-      avatar.textContent = isUser ? '👤' : '✦';
-
-      // Bubble
-      const bubble = document.createElement('div');
-      bubble.classList.add('msg-bubble');
-      bubble.textContent = text;
-
-      msgEl.appendChild(avatar);
-      msgEl.appendChild(bubble);
-      chatMessages.appendChild(msgEl);
-      scrollToBottom();
-
-      return msgEl;
+      const row = document.createElement('div');
+      row.className = `msg ${role === 'user' ? 'user' : 'ai'}${role === 'error' ? ' msg-error' : ''}`;
+      row.innerHTML = `
+        <div class="msg-avatar" aria-hidden="true">${role === 'user' ? '👤' : '✦'}</div>
+        <div class="msg-bubble"></div>`;
+      row.querySelector('.msg-bubble').textContent = text;
+      messages.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
     }
 
-    /**
-     * Show an animated typing indicator (three bouncing dots).
-     * @returns {HTMLElement} - The typing indicator row element
-     */
     function showTyping() {
       const row = document.createElement('div');
-      row.classList.add('msg', 'ai');
-      row.id = 'typing-indicator';
-
-      const avatar = document.createElement('div');
-      avatar.classList.add('msg-avatar');
-      avatar.setAttribute('aria-hidden', 'true');
-      avatar.textContent = '✦';
-
-      const dots = document.createElement('div');
-      dots.classList.add('typing');
-      dots.setAttribute('aria-label', 'Cura is typing');
-      dots.innerHTML = '<span></span><span></span><span></span>';
-
-      row.appendChild(avatar);
-      row.appendChild(dots);
-      chatMessages.appendChild(row);
-      scrollToBottom();
-      return row;
+      row.className = 'msg ai'; row.id = 'typing';
+      row.innerHTML = `<div class="msg-avatar" aria-hidden="true">✦</div>
+        <div class="typing"><span></span><span></span><span></span></div>`;
+      messages.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
     }
 
-    /**
-     * Remove the typing indicator from the DOM.
-     */
-    function hideTyping() {
-      const indicator = document.getElementById('typing-indicator');
-      if (indicator) indicator.remove();
+    function setLoading(on) {
+      sendBtn.disabled = chatInput.disabled = on;
+      sendBtn.textContent = on ? '…' : '➤';
     }
 
-    /**
-     * Toggle the send button + input disabled state.
-     * @param {boolean} disabled
-     */
-    function setLoading(disabled) {
-      sendBtn.disabled  = disabled;
-      chatInput.disabled = disabled;
-      sendBtn.textContent = disabled ? '…' : '➤';
-    }
-
-    /* ──────────────────────────────────────────
-       Core: send message to FastAPI backend
-    ────────────────────────────────────────── */
+    /* ── Send message → Flask /chat (same server) ── */
     async function sendMessage() {
       const text = chatInput.value.trim();
       if (!text) return;
 
-      // 1. Render user bubble & clear input
       appendMessage(text, 'user');
       chatInput.value = '';
       setLoading(true);
-
-      // 2. Show typing indicator
       showTyping();
 
       try {
-        // 3. POST to FastAPI /chat endpoint
-        const response = await fetch(API_URL, {
+        const res = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text }),
         });
 
-        if (!response.ok) {
-          throw new Error(`Server responded with status ${response.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const data = await response.json();
+        const data = await res.json();
 
-        // 4. Remove typing indicator & render AI reply
-        hideTyping();
-        appendMessage(data.response ?? 'No response received.', 'ai');
+        document.getElementById('typing')?.remove();
+        appendMessage(data.response, 'ai');
 
       } catch (err) {
-        console.error('[Cura] Chat error:', err);
-        hideTyping();
-        appendMessage(
-          'Sorry, I couldn\'t connect to the server. Please try again shortly.',
-          'error'
-        );
+        console.error('[Cura]', err);
+        document.getElementById('typing')?.remove();
+        appendMessage("Sorry, something went wrong. Please try again.", 'error');
       } finally {
         setLoading(false);
         chatInput.focus();
       }
     }
 
-    /* ──────────────────────────────────────────
-       Event listeners
-    ────────────────────────────────────────── */
-
-    // Send on button click
     sendBtn.addEventListener('click', sendMessage);
-
-    // Send on Enter key (Shift+Enter = new line passthrough)
-    chatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
-    /* ──────────────────────────────────────────
-       Smooth scroll for anchor links
-    ────────────────────────────────────────── */
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', (e) => {
-        const target = document.querySelector(anchor.getAttribute('href'));
-        if (target) {
-          e.preventDefault();
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+    /* ── Smooth scroll ── */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const t = document.querySelector(a.getAttribute('href'));
+        if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
       });
     });
   </script>

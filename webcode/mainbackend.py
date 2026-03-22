@@ -13,7 +13,7 @@ app.config['DEBUG'] = True
 # Home route
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    
+
     return render_template("homepage.html")
 
 
@@ -22,6 +22,18 @@ def home():
 def about():
 
     return render_template("about.html")
+
+#receive message from front end
+@app.route("/chat", methods=["POST"])
+def chat():
+    """Receives { message }, processes it, returns { response }."""
+    data    = request.get_json(force=True)
+    message = data.get("message", "").strip()
+
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+
+    return jsonify({"response": "fill"})
 
 # Run the app
 if __name__ == '__main__':
