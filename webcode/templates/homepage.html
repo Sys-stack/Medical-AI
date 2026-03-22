@@ -215,18 +215,39 @@
       }
     }
 
-    sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
+      document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', async (e) => {
 
-    /* ── Smooth scroll ── */
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-      a.addEventListener('click', e => {
-        const t = document.querySelector(a.getAttribute('href'));
-        if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+    const href = a.getAttribute('href');
+
+    // 👉 Only intercept chat button
+    if (href === '#chat') {
+      e.preventDefault();
+
+      const res = await fetch('/homeclick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ click: "True" })
       });
-    });
+
+      const data = await res.json();
+
+      if (data.redirect) {
+        window.location.href = data.redirect;
+      }
+    } 
+    else {
+      // ✅ normal smooth scroll
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+  });
+});
+
   </script>
 
 </body>

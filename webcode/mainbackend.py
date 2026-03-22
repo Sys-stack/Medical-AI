@@ -1,6 +1,6 @@
 # IMPORTS --------------------------
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import os
 
 # Initialize Flask app
@@ -34,6 +34,20 @@ def chat():
         return jsonify({"error": "Empty message"}), 400
 
     return jsonify({"response": "fill"})
+
+@app.route("/homeclick", methods=['POST'])
+def homeclick():
+    data = request.get_json()
+    redirect_con = data.get("click")
+
+    if redirect_con:
+        return jsonify({"redirect": "/chatAI"})
+    
+    return jsonify({"status": "no action"})
+
+@app.route("/chatAI", methods = ['GET','POST'])
+def chatAI():
+    return render_template("chat.html")
 
 # Run the app
 if __name__ == '__main__':

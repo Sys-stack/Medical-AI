@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<!--
+  templates/chat.html
+  Cura — Dedicated Chat Page
+  Pure UI: no processing logic. Only animations + an empty fetch stub.
+  Add your Flask route:  @app.route("/chat-page") → render_template("chat.html")
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cura — Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
+</head>
+
+<!-- chat-page-body locks the viewport so the chat fills the full screen -->
+<body class="chat-page-body">
+
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+
+  <!-- ════════════════════════════════════════
+       NAVBAR
+  ════════════════════════════════════════ -->
+  <header class="navbar" id="navbar">
+    <div class="container">
+      <a href="/" class="nav-logo">Cura<span class="accent-dot">.</span></a>
+      <nav>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/chat-page">Chat</a></li>
+        </ul>
+      </nav>
+      <button
+        class="nav-toggle" id="nav-toggle"
+        aria-label="Toggle navigation" aria-expanded="false"
+      >
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════
+       MAIN — sidebar + chat card fill the screen
+  ════════════════════════════════════════ -->
+  <main class="chat-page-main">
+
+    <!-- Sidebar (visible ≥ 1100px) -->
+    <aside class="chat-sidebar">
+
+      <a href="/" class="sidebar-logo">Cura<span class="accent-dot">.</span></a>
+
+      <div>
+        <p class="sidebar-label">About</p>
+        <p class="sidebar-desc">
+          Your personal AI care assistant — ask about symptoms,
+          appointments, or general wellbeing.
+        </p>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-tags">
+        <p class="sidebar-label">Capabilities</p>
+        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Symptom guidance</div>
+        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Appointment scheduling</div>
+        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Medication queries</div>
+        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Wellness advice</div>
+        <div class="sidebar-tag"><span class="sidebar-tag-dot"></span>Care navigation</div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <p class="sidebar-desc" style="font-size:0.72rem;">
+        Cura does not replace professional medical advice.
+        Always consult a qualified clinician for diagnosis.
+      </p>
+
+    </aside>
+
+    <!-- Chat card -->
+    <div class="chat-card" role="region" aria-label="Chat with Cura">
+
+      <!-- Card header -->
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <span class="chat-status" aria-label="Online"></span>
+          <span class="chat-title">Cura Assistant</span>
+        </div>
+        <span class="chat-header-right">Powered by AI</span>
+      </div>
+
+      <!-- Messages -->
+      <div
+        class="chat-messages"
+        id="chat-messages"
+        role="log"
+        aria-live="polite"
+        aria-label="Conversation"
+      >
+        <!-- Greeting bubble -->
+        <div class="msg ai">
+          <div class="msg-avatar" aria-hidden="true">✦</div>
+          <div class="msg-bubble">
+            Hello! I'm Cura, your personal AI care assistant.
+            How are you feeling today, and how can I help?
+          </div>
+        </div>
+      </div>
+
+      <!-- Input row -->
+      <div class="chat-input-area">
+        <label for="chat-input" class="sr-only">Your message</label>
+        <input
+          type="text"
+          id="chat-input"
+          class="chat-input"
+          placeholder="Type your message…"
+          autocomplete="off"
+          maxlength="500"
+        />
+        <button id="send-btn" class="send-btn" aria-label="Send message">
+          &#10148;
+        </button>
+      </div>
+
+    </div><!-- /chat-card -->
+
+  </main>
+
+  <!-- Bottom disclaimer bar -->
+  <div class="chat-page-hint">
+    Cura is an AI assistant · Responses are not medical advice · &copy; <span id="year"></span> Cura
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SCRIPT
+       — Navbar + mobile nav animations only
+       — appendMessage / showTyping for bubble animations
+       — sendMessage has an EMPTY fetch stub;
+         plug your Flask /chat endpoint logic inside it
+  ════════════════════════════════════════ -->
+  <script>
+    /* ── Misc ── */
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    /* ── Navbar: compact on scroll ── */
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    /* ── Mobile nav toggle ── */
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks  = document.getElementById('nav-links');
+    navToggle.addEventListener('click', () => {
+      const open = navLinks.classList.toggle('open');
+      navToggle.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+    });
+
+    /* ── DOM refs ── */
+    const messages  = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn   = document.getElementById('send-btn');
+
+    /* ── UI animations ── */
+
+    /** Append a styled bubble and animate it in */
+    function appendMessage(text, role) {
+      const row = document.createElement('div');
+      row.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'msg-avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.textContent = role === 'user' ? '👤' : '✦';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      bubble.textContent = text;
+
+      row.append(avatar, bubble);
+      messages.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    /** Show three-dot typing indicator */
+    function showTyping() {
+      const row = document.createElement('div');
+      row.className = 'msg ai';
+      row.id = 'typing-indicator';
+      row.innerHTML = `
+        <div class="msg-avatar" aria-hidden="true">✦</div>
+        <div class="typing">
+          <span></span><span></span><span></span>
+        </div>`;
+      messages.appendChild(row);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    /** Remove typing indicator */
+    function hideTyping() {
+      document.getElementById('typing-indicator')?.remove();
+    }
+
+    /** Lock / unlock input while waiting for a response */
+    function setLoading(on) {
+      sendBtn.disabled   = on;
+      chatInput.disabled = on;
+      sendBtn.textContent = on ? '…' : '➤';
+    }
+
+    /* ════════════════════════════════════════
+       FETCH STUB — wire up your Flask backend here.
+       Replace the comment block inside the try{}
+       with your actual fetch() call to /chat.
+    ════════════════════════════════════════ */
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      /* Render user bubble */
+      appendMessage(text, 'user');
+      chatInput.value = '';
+      setLoading(true);
+      showTyping();
+
+      try {
+
+        /* ── YOUR FETCH GOES HERE ──────────────────
+         *
+         * const res  = await fetch('/chat', {
+         *   method:  'POST',
+         *   headers: { 'Content-Type': 'application/json' },
+         *   body:    JSON.stringify({ message: text }),
+         * });
+         * const data = await res.json();
+         * hideTyping();
+         * appendMessage(data.response, 'ai');
+         *
+         * ─────────────────────────────────────── */
+
+      } catch (err) {
+        hideTyping();
+        /* Optionally surface an error bubble:
+         * appendMessage('Something went wrong. Please try again.', 'ai');
+         */
+      } finally {
+        setLoading(false);
+        chatInput.focus();
+      }
+    }
+
+    /* ── Event listeners ── */
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+
+</body>
+</html>
