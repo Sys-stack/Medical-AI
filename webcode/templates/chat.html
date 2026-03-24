@@ -4,8 +4,8 @@
   Serves via:  GET /chatAI  in mainbackend.py
 
   Flask routes used:
-    POST /chat      — send message, get AI response + convo_id
-    GET  /history   — load sidebar conversation list
+    POST /chat      — send message + optional image, get AI response + convo_id
+    GET  /history   — load sidebar conversation list (session-scoped)
     POST /compare   — health-progress analysis on selected convos
 -->
 <html lang="en">
@@ -14,6 +14,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cura — Chat</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
+  <style>
+    /* ── Image upload additions ──────────────────────────────── */
+    .upload-btn {
+      display:         flex;
+      align-items:     center;
+      justify-content: center;
+      width:           2.4rem;
+      height:          2.4rem;
+      border-radius:   50%;
+      border:          1.5px solid var(--border, rgba(255,255,255,.15));
+      background:      transparent;
+      color:           var(--text-muted, #8b95a8);
+      cursor:          pointer;
+      flex-shrink:     0;
+      transition:      background .2s, color .2s, border-color .2s;
+      font-size:       1.05rem;
+      line-height:     1;
+    }
+    .upload-btn:hover,
+    .upload-btn.has-file {
+      background:    rgba(108, 99, 255, .18);
+      border-color:  rgba(108, 99, 255, .55);
+      color:         #a29bff;
+    }
+    .upload-btn.has-file::after {
+      content:      '';
+      position:     absolute;
+      top:          .1rem;
+      right:        .1rem;
+      width:        .5rem;
+      height:       .5rem;
+      border-radius:50%;
+      background:   #6c63ff;
+    }
+    .upload-btn { position: relative; }
+
+    .image-preview-row {
+      display:       flex;
+      align-items:   center;
+      gap:           .6rem;
+      padding:       .45rem .9rem .1rem;
+      font-size:     .78rem;
+      color:         var(--text-muted, #8b95a8);
+      min-height:    0;
+      max-height:    0;
+      overflow:      hidden;
+      transition:    max-height .25s ease, padding .25s ease;
+    }
+    .image-preview-row.visible {
+      max-height: 4rem;
+    }
+    .image-preview-thumb {
+      width:         2.4rem;
+      height:        2.4rem;
+      object-fit:    cover;
+      border-radius: .4rem;
+      border:        1px solid rgba(255,255,255,.12);
+    }
+    .image-preview-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .image-preview-remove {
+      background:  none;
+      border:      none;
+      color:       var(--text-muted, #8b95a8);
+      cursor:      pointer;
+      font-size:   .9rem;
+      padding:     0 .2rem;
+      line-height: 1;
+    }
+    .image-preview-remove:hover { color: #ff6b6b; }
+
+    /* Image badge in the user message bubble */
+    .msg-image-preview {
+      display:       block;
+      max-width:     180px;
+      max-height:    140px;
+      border-radius: .5rem;
+      margin-bottom: .4rem;
+      border:        1px solid rgba(255,255,255,.12);
+    }
+  </style>
 </head>
 
 <body class="chat-page-body">
@@ -122,14 +207,36 @@
           <div class="input-prompt" id="input-prompt">
             <p class="input-prompt-eyebrow">Ask Cura anything</p>
             <h2 class="input-prompt-headline">What can I help you <em>with?</em></h2>
-            <p class="input-prompt-sub">Type your question below — you'll receive a personalised response.</p>
+            <p class="input-prompt-sub">
+              Type your question or upload a prescription / lab result image below.
+            </p>
+          </div>
+
+          <!-- Image preview strip (shown when a file is selected) -->
+          <div class="image-preview-row" id="image-preview-row">
+            <img src="" alt="Preview" class="image-preview-thumb" id="image-preview-thumb" />
+            <span class="image-preview-name" id="image-preview-name"></span>
+            <button class="image-preview-remove" id="image-preview-remove"
+                    aria-label="Remove image" title="Remove image">✕</button>
           </div>
 
           <div class="input-row">
+
+            <!-- Hidden file input -->
+            <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/webp"
+                   style="display:none" aria-label="Upload image" />
+
+            <!-- Paperclip / upload button -->
+            <button class="upload-btn" id="upload-btn" type="button"
+                    aria-label="Attach prescription or lab result image"
+                    title="Attach image (prescription, lab result, etc.)">
+              📎
+            </button>
+
             <label for="chat-input" class="sr-only">Your message</label>
             <input
               type="text" id="chat-input" class="chat-input"
-              placeholder="Describe your symptoms or ask a question…"
+              placeholder="Describe your symptoms, paste a finding, or attach an image…"
               autocomplete="off" maxlength="500"
             />
             <button id="send-btn" class="send-btn" aria-label="Send message">&#10148;</button>
@@ -182,6 +289,17 @@
     const compareBody       = document.getElementById('compare-report-body');
     const comparePanelClose = document.getElementById('compare-panel-close');
 
+    /* Image upload refs */
+    const uploadBtn         = document.getElementById('upload-btn');
+    const imageFileInput    = document.getElementById('image-file-input');
+    const imagePreviewRow   = document.getElementById('image-preview-row');
+    const imagePreviewThumb = document.getElementById('image-preview-thumb');
+    const imagePreviewName  = document.getElementById('image-preview-name');
+    const imagePreviewRemove= document.getElementById('image-preview-remove');
+
+    /* Currently selected image File object (or null) */
+    let selectedImageFile = null;
+
     /* ── Navbar shrink on scroll ────────────────────────────── */
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 20);
@@ -197,8 +315,6 @@
 
     /* ════════════════════════════════════════════════════════
        SIDEBAR COLLAPSE / EXPAND
-       Preference stored in sessionStorage so it survives
-       a page reload within the same tab.
     ════════════════════════════════════════════════════════ */
     let sidebarOpen = sessionStorage.getItem('cura_sidebar') !== '0';
 
@@ -209,19 +325,52 @@
       sessionStorage.setItem('cura_sidebar', open ? '1' : '0');
     }
 
-    setSidebar(sidebarOpen);   // apply saved preference on load
-
+    setSidebar(sidebarOpen);
     sidebarToggle.addEventListener('click', () => setSidebar(!sidebarOpen));
 
 
     /* ════════════════════════════════════════════════════════
-       HISTORY  —  GET /history
-       Called on page load and after every successful /chat
-       response so the sidebar always reflects the latest state.
+       IMAGE UPLOAD
+    ════════════════════════════════════════════════════════ */
 
-       Flask returns:
-         { "conversations": [ { id, date, title, prompt }, ... ] }
-       Handled by get_sorted_history() in classes.py.
+    uploadBtn.addEventListener('click', () => imageFileInput.click());
+
+    imageFileInput.addEventListener('change', () => {
+      const file = imageFileInput.files[0];
+      if (!file) return;
+
+      selectedImageFile = file;
+      uploadBtn.classList.add('has-file');
+
+      /* Show thumbnail preview */
+      const reader = new FileReader();
+      reader.onload = e => {
+        imagePreviewThumb.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+
+      imagePreviewName.textContent = file.name.length > 32
+        ? file.name.slice(0, 29) + '…'
+        : file.name;
+
+      imagePreviewRow.classList.add('visible');
+    });
+
+    imagePreviewRemove.addEventListener('click', clearImage);
+
+    function clearImage() {
+      selectedImageFile    = null;
+      imageFileInput.value = '';
+      uploadBtn.classList.remove('has-file');
+      imagePreviewRow.classList.remove('visible');
+      imagePreviewThumb.src = '';
+      imagePreviewName.textContent = '';
+    }
+
+
+    /* ════════════════════════════════════════════════════════
+       HISTORY  —  GET /history
+       Session-scoped: each user only sees their own history.
     ════════════════════════════════════════════════════════ */
     async function loadHistory() {
       try {
@@ -234,7 +383,6 @@
       }
     }
 
-    /* Render conversation list into the sidebar */
     function renderHistory(convos) {
       if (!convos || convos.length === 0) {
         hsList.innerHTML = '<li class="hs-item hs-item--empty">No past conversations yet.</li>';
@@ -247,7 +395,6 @@
         const li = document.createElement('li');
         li.className  = 'hs-item';
         li.dataset.id = convo.id;
-        /* Escape title/prompt to avoid XSS */
         const safeTitle  = escapeHtml(convo.title);
         const safePrompt = escapeHtml(convo.prompt);
         li.innerHTML = `
@@ -267,13 +414,12 @@
       });
     }
 
-    /* Highlight checked rows and show/hide the compare bar */
     function onCheckboxChange() {
       const checked = [...hsList.querySelectorAll('.hs-checkbox:checked')];
       const count   = checked.length;
 
-      compareBar.hidden       = count < 2;
-      compareBtn.disabled     = count < 2;
+      compareBar.hidden        = count < 2;
+      compareBtn.disabled      = count < 2;
       compareCount.textContent = `${count} selected`;
 
       hsList.querySelectorAll('.hs-item').forEach(li => {
@@ -285,18 +431,6 @@
 
     /* ════════════════════════════════════════════════════════
        COMPARE  —  POST /compare
-       Collects the ids of every checked conversation and sends
-       them to Flask. Flask calls lookup_convos() + build_timeline()
-       in classes.py, then passes the timeline to the AI.
-
-       Flask returns:
-         { "report": "<plain-text health analysis>" }
-
-       ── API NOTE ─────────────────────────────────────────
-       The report text comes from the Gemini/LLM call inside
-       the /compare route in mainbackend.py. Wire that call up
-       and this function will display the result automatically.
-       ─────────────────────────────────────────────────────
     ════════════════════════════════════════════════════════ */
     async function runCompare() {
       const selectedIds = [...hsList.querySelectorAll('.hs-checkbox:checked')]
@@ -304,7 +438,6 @@
 
       if (selectedIds.length < 2) return;
 
-      /* Show panel with loading dots */
       comparePanel.hidden   = false;
       compareBody.innerHTML = `
         <div class="typing compare-typing">
@@ -313,7 +446,7 @@
       comparePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
-        const res  = await fetch('/compare', {
+        const res = await fetch('/compare', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ ids: selectedIds }),
@@ -322,8 +455,6 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-
-        /* Render the report — preserve newlines from build_timeline() */
         compareBody.style.whiteSpace = 'pre-wrap';
         compareBody.textContent      = data.report;
 
@@ -343,29 +474,33 @@
 
     /* ════════════════════════════════════════════════════════
        CHAT  —  POST /chat
-       Sends the user's single message to Flask.
-       Flask creates a convoHistory object, calls set_response(),
-       saves it to dictofconvos, and returns:
-         { "response": "<AI reply>", "convo_id": "<id>" }
-
-       ── API NOTE ─────────────────────────────────────────
-       The response text comes from the Gemini/LLM call inside
-       the /chat route in mainbackend.py. Wire that call up and
-       the reply will flow through here automatically.
-       ─────────────────────────────────────────────────────
+       Sends message + optional image as multipart/form-data.
     ════════════════════════════════════════════════════════ */
 
-    /* UI state helpers */
-    function appendMessage(text, role) {
+    function appendMessage(text, role, imageDataUrl) {
       const row    = document.createElement('div');
       row.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+
       const avatar  = document.createElement('div');
       avatar.className = 'msg-avatar';
       avatar.setAttribute('aria-hidden', 'true');
       avatar.textContent = role === 'user' ? '👤' : '✦';
+
       const bubble  = document.createElement('div');
       bubble.className = 'msg-bubble';
-      bubble.textContent = text;
+
+      /* If an image was attached, show a thumbnail in the bubble */
+      if (imageDataUrl) {
+        const img   = document.createElement('img');
+        img.src     = imageDataUrl;
+        img.alt     = 'Attached image';
+        img.className = 'msg-image-preview';
+        bubble.appendChild(img);
+      }
+
+      const textNode = document.createTextNode(text);
+      bubble.appendChild(textNode);
+
       row.append(avatar, bubble);
       messages.appendChild(row);
       messages.scrollTop = messages.scrollHeight;
@@ -390,31 +525,43 @@
       if (state === 'sent') {
         inputArea.classList.add('sent');
         messages.classList.add('visible');
-        chatInput.disabled = sendBtn.disabled = true;
+        chatInput.disabled = sendBtn.disabled = uploadBtn.disabled = true;
         sendBtn.textContent = '…';
       }
       if (state === 'done') {
         inputArea.classList.add('hidden-out');
         chatDone.hidden = false;
         chatDone.classList.add('visible');
-        /* Refresh sidebar so the new conversation appears immediately */
         loadHistory();
       }
     }
 
     async function sendMessage() {
       const text = chatInput.value.trim();
-      if (!text) return;
+      if (!text && !selectedImageFile) return;
+
+      /* Snapshot the image data URL before we clear the file */
+      let imageDataUrl = null;
+      if (selectedImageFile) {
+        imageDataUrl = imagePreviewThumb.src;  // already set by FileReader
+      }
 
       transitionTo('sent');
-      appendMessage(text, 'user');
+      appendMessage(text || '(image only)', 'user', imageDataUrl);
       showTyping();
 
       try {
+        /* Always send as multipart so the backend handles both cases uniformly */
+        const formData = new FormData();
+        formData.append('message', text);
+        if (selectedImageFile) {
+          formData.append('image', selectedImageFile);
+        }
+
         const res = await fetch('/chat', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ message: text }),
+          method: 'POST',
+          body:   formData,
+          /* Do NOT set Content-Type — browser sets it with the correct boundary */
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
