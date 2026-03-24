@@ -5,7 +5,7 @@ from urllib.parse import quote
 import os
 
 # ── Config ────────────────────────────────────────────────────────────────────
-GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY")   # Replace with your key
+GEMINI_API_KEY  = "AIzaSyCIxdk5H8gPMNQc4wHkzj-ZqKslxtKxDto"   # Replace with your key
 OPENFDA_API_KEY = os.environ.get("OPENFDA_API_KEY")  # Replace with your key
 
 GEMINI_URL   = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -19,19 +19,31 @@ NLM_BASE     = "https://rxnav.nlm.nih.gov/REST"
 # ══════════════════════════════════════════════════════════════════════════════
 
 _EXTRACTION_PROMPT = """
-You are a medical prescription analyzer.
+You are a STRICT medical prescription parser.
 
-Given a prescription (text or image), you must respond ONLY in this JSON format with no extra text:
+You MUST return ONLY valid JSON. No explanation. No markdown.
 
+FORMAT:
 {
-  "summary": "Plain language summary of the full prescription — what condition is being treated, what drugs are prescribed, dosage, and how long to take them",
-  "drugs": ["drug_name_1", "drug_name_2"]
+  "summary": "short clear summary of prescription",
+  "drugs": ["exact drug names only"]
 }
 
-Rules:
-- summary: clear, simple explanation a patient can understand — include condition, drug names, dosage, frequency, and duration if available
-- drugs: list of generic drug names found in the prescription (lowercase)
-- Return ONLY the JSON, no markdown, no explanation
+RULES:
+- Extract ONLY real medicine names (ignore instructions like "after food")
+- Do NOT guess random drug names
+- If unclear, return best possible guess
+- If none found, return empty list
+- Output MUST be valid JSON (no extra text before or after)
+
+EXAMPLE INPUT:
+"Take Paracetamol 500mg twice daily"
+
+EXAMPLE OUTPUT:
+{
+  "summary": "Patient is prescribed Paracetamol 500mg twice daily",
+  "drugs": ["Paracetamol"]
+}
 """
 
 
