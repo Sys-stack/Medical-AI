@@ -83,7 +83,13 @@ def call_gemini(text: str = None, image_path: str = None) -> dict:
     try:
         return json.loads(clean)
     except json.JSONDecodeError:
-        return {"error": f"Could not parse Gemini response: {clean[:200]}"}
+        print("[Gemini RAW OUTPUT]", clean)
+
+        # fallback: extract manually
+        return {
+            "summary": clean[:500],
+            "drugs": []
+        }
 
 
 def build_endpoints(drug_name: str) -> dict:
