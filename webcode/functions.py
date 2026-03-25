@@ -52,7 +52,7 @@ def call_gemini(text: str) -> dict:
         parts: list = [_EXTRACTION_PROMPT, f"\nPrescription text:\n{text}\n"]
 
         response = client.models.generate_content(
-            model    = "gemini-2.5-pro",
+            model    = "gemini-3-flash-preview",
             contents = parts,
             config   = types.GenerateContentConfig(temperature=0.2),
         )
@@ -189,18 +189,13 @@ def call_gemini_for_response(
 
     try:
         response = client.models.generate_content(
-            model    = "gemini-1.5-flash",
-            contents = [
-                types.Content(
-                    role  = "user",
-                    parts = [
-                        types.Part.from_text(_RESPONSE_SYSTEM),
-                        types.Part.from_text(user_turn),
-                    ],
-                )
-            ],
-            config = types.GenerateContentConfig(temperature=0.4),
-        )
+        model="gemini-3-flash-preview",
+        contents=user_turn,
+        config=types.GenerateContentConfig(
+            temperature=0.4,
+            system_instruction=_RESPONSE_SYSTEM
+        ),
+    )
         return response.text or "No response generated."
     except Exception as exc:
         return f"Error generating response: {exc}"
