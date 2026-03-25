@@ -12,6 +12,7 @@ from google.genai import types
 API_KEYS = [
     os.environ.get("GEMINI_API_KEY"),
     os.environ.get("GEMINI_API_KEY_1"),
+    os.environ.get("GEMINI_API_KEY_2")
 ]
 
 OPENFDA_API_KEY = os.environ.get("OPENFDA_API_KEY")
@@ -33,18 +34,6 @@ GEMINI_MODELS = [
 
     # ⚡ Best balance
     "gemini-2.5-flash",
-
-    # 🧠 High-quality reasoning
-    "gemini-2.5-pro",
-
-    # 🚀 Stable fast models
-    "gemini-2-flash",
-
-    # 💸 Cheapest / fallback
-    "gemini-2-flash-lite",
-
-    # 🧪 Experimental (may fail sometimes)
-    "gemini-2-flash-exp",
 
     # 🔄 Alias (keep LAST)
     "gemini-flash-latest"
