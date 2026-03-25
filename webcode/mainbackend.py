@@ -3,6 +3,7 @@
 # Run: python mainbackend.py
 # =============================================================
 import sys
+import base64
 import os
 import uuid
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,7 +15,7 @@ from functions import (
     call_gemini,
     build_endpoints,
     call_gemini_for_response,
-    call_gemini_for_comparison,
+    call_gemini_for_comparison,   # now defined in functions.py
 )
 
 # ── Flask app ─────────────────────────────────────────────────
@@ -22,6 +23,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY']            = os.environ.get('commkey', 'dev-secret-key-change-in-prod')
 app.config['DEBUG']                 = True
 app.config['MAX_CONTENT_LENGTH']    = 16 * 1024 * 1024   # 16 MB upload limit
+
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 
 # =============================================================
@@ -48,6 +51,13 @@ def _get_user_convos() -> dict[str, convoHistory]:
     return _session_store[sid]
 
 
+def _allowed_image(filename: str) -> bool:
+    return (
+        '.' in filename
+        and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    )
+
+
 # =============================================================
 # PAGES
 # =============================================================
@@ -69,11 +79,12 @@ def chatAI():
 
 # =============================================================
 # CHAT  —  POST /chat
-# Accepts JSON with a text message.
+# Accepts multipart/form-data (text + optional image) OR JSON.
 # Frontend: sendMessage() in chat.html
 #
-# JSON fields:
+# Multipart fields:
 #   message : str  — the user's text
+#   image   : file — optional image (prescription scan, lab result, etc.)
 #
 # Returns : { "response": "<AI reply>", "convo_id": "<id>" }
 # =============================================================
@@ -82,47 +93,73 @@ def chatAI():
 def chat():
     dictofconvos = _get_user_convos()
 
-    # ── 1. Parse incoming JSON request ───────────────────────
-    data    = request.get_json(force=True)
-    message = (data.get("message", "") or "").strip()
+    # ── 1. Parse incoming request (multipart OR JSON) ─────────
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        message    = (request.form.get("message", "") or "").strip()
+        image_file = request.files.get("image")
+    else:
+        data       = request.get_json(force=True)
+        message    = (data.get("message", "") or "").strip()
+        image_file = None
 
-    if not message:
+    if not message and not image_file:
         return jsonify({"error": "Empty message"}), 400
 
-    # ── 2. Create conversation object ─────────────────────────
-    convo = convoHistory(message)
+    # ── 2. Handle uploaded image (save temporarily) ───────────
+    image_path = None
+    if image_file and _allowed_image(image_file.filename):
+        tmp_dir    = os.path.join(os.path.dirname(__file__), "tmp_uploads")
+        os.makedirs(tmp_dir, exist_ok=True)
+        ext        = image_file.filename.rsplit('.', 1)[1].lower()
+        image_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}.{ext}")
+        image_file.save(image_path)
 
-    # ── 3. PIPELINE ───────────────────────────────────────────
+    # ── 3. Create conversation object ─────────────────────────
+    prompt_label = message if message else "[Image upload]"
+    convo        = convoHistory(prompt_label)
+
+    # ── 4. PIPELINE ───────────────────────────────────────────
     #
-    # Step A — Gemini reads the prescription / medical text.
+    # Step A — Gemini reads the prescription / medical text + optional image.
     #          Returns: { summary, drugs: ["drug1", ...] }
     #
-    # Step B — For each drug, build API endpoints and fetch data
-    #          from OpenFDA + NLM via data_fetch().
+    # Step B — For each drug, build API endpoints and fetch data from
+    #          OpenFDA + NLM via data_fetch().
     #
-    # Step C — Second Gemini call: convert all findings into
-    #          plain-language layman's terms for the patient.
+    # Step C — Second Gemini call: convert all findings into plain-language
+    #          layman's terms for the patient.
     # ──────────────────────────────────────────────────────────
+    # Convert image → base64
+    image_b64 = None
+    if image_path:
+        with open(image_path, "rb") as f:
+            image_b64 = base64.b64encode(f.read()).decode("utf-8")
+
     try:
-        # Step A: extract summary + drug list from prescription
-        gemini_result = call_gemini(text=message)
+        # Step A: extract summary + drug list
+        gemini_result = call_gemini(
+            text=message or "",
+            image_b64=image_b64
+        )
 
         if "error" in gemini_result:
+            error_msg = gemini_result.get("error", "Unknown error")
+
             response_text = (
-                "I had trouble reading that prescription. "
-                "Please make sure the text is clear and try again."
+                "I had trouble reading that prescription.\n"
+                f"Error details: {error_msg}"
             )
         else:
             summary   = gemini_result.get("summary", "")
             drug_list = gemini_result.get("drugs", [])
 
-            # Step B: fetch OpenFDA + NLM data for every identified drug
+            # Step B
             drug_details: dict = {}
             for drug in drug_list:
                 endpoints          = build_endpoints(drug)
                 drug_details[drug] = data_fetch(endpoints)
 
-            # Step C: generate patient-friendly explanation
+            # Step C
             response_text = call_gemini_for_response(
                 user_message = message,
                 summary      = summary,
@@ -131,13 +168,18 @@ def chat():
 
     except Exception as exc:
         app.logger.error(f"[/chat] Pipeline error: {exc}", exc_info=True)
-        response_text = "Something went wrong while processing your request. Please try again."
+        response_text = f"Something went wrong while processing your request. Please try again. {exc}"
 
-    # ── 4. Store the completed conversation ───────────────────
+    finally:
+        # Always clean up the temporary image file
+        if image_path and os.path.exists(image_path):
+            os.remove(image_path)
+
+    # ── 5. Store the completed conversation ───────────────────
     convo.set_response(response_text)
     dictofconvos[convo.id] = convo
 
-    # ── 5. Return response + id to the frontend ───────────────
+    # ── 6. Return response + id to the frontend ───────────────
     return jsonify({
         "response": response_text,
         "convo_id": convo.id,
@@ -187,6 +229,7 @@ def compare():
     timeline = build_timeline(selected)
 
     # ── 4. Gemini comparison call ─────────────────────────────
+    
     try:
         report = call_gemini_for_comparison(timeline)
     except Exception as exc:

@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cura — AI-Powered Care</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
+  <script>
+    (function(){
+      var t = localStorage.getItem('cura_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
 
@@ -23,6 +29,9 @@
           <li><a href="#contact">Contact</a></li>
         </ul>
       </nav>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+        🌙
+      </button>
       <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
         <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
@@ -128,6 +137,19 @@
   <script>
     /* ── Misc ── */
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    /* Theme toggle */
+    var _tt = document.getElementById('theme-toggle');
+    function applyTheme(th) {
+      document.documentElement.setAttribute('data-theme', th);
+      if(_tt) _tt.textContent = th === 'light' ? '🌙' : '☀️';
+      localStorage.setItem('cura_theme', th);
+    }
+    applyTheme(localStorage.getItem('cura_theme') || 'dark');
+    if(_tt) _tt.addEventListener('click', function() {
+      var c = document.documentElement.getAttribute('data-theme') || 'dark';
+      applyTheme(c === 'dark' ? 'light' : 'dark');
+    });
 
     /* ── Navbar shrink on scroll ── */
     const navbar = document.getElementById('navbar');

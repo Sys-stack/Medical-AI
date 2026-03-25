@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <!--
   templates/chat.html — Cura Dedicated Chat Page
-  Serves via:  GET /chatAI  in mainbackend.py
-
   Flask routes used:
-    POST /chat      — send message, get AI response + convo_id
-    GET  /history   — load sidebar conversation list (session-scoped)
+    POST /chat      — send message (+optional image), get AI response
+    GET  /history   — load sidebar conversation list
     POST /compare   — health-progress analysis on selected convos
 -->
 <html lang="en">
@@ -14,7 +12,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cura — Chat</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
-
 </head>
 
 <body class="chat-page-body">
@@ -22,12 +19,9 @@
   <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
   <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       NAVBAR
-  ══════════════════════════════════════════════════════════ -->
+  <!-- NAVBAR -->
   <header class="navbar" id="navbar">
     <div class="container">
-
       <button class="sidebar-toggle-btn" id="sidebar-toggle-btn"
               aria-label="Toggle history sidebar" aria-expanded="true">
         <span class="stb-bar"></span>
@@ -44,37 +38,33 @@
         </ul>
       </nav>
 
+      <!-- Theme toggle -->
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">
+        🌙
+      </button>
+
       <button class="nav-toggle" id="nav-toggle"
               aria-label="Toggle navigation" aria-expanded="false">
         <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
-
     </div>
   </header>
 
-
-  <!-- ══════════════════════════════════════════════════════════
-       APP SHELL
-  ══════════════════════════════════════════════════════════ -->
+  <!-- APP SHELL -->
   <div class="app-shell" id="app-shell">
 
-    <!-- ── HISTORY SIDEBAR ───────────────────────────────────── -->
+    <!-- HISTORY SIDEBAR -->
     <aside class="history-sidebar" id="history-sidebar" aria-label="Conversation history">
-
       <div class="hs-header">
         <span class="hs-title">History</span>
         <a href="/chatAI" class="hs-new-btn" title="New conversation">＋</a>
       </div>
 
-      <!-- Compare action bar — visible when ≥ 2 items are checked -->
       <div class="hs-compare-bar" id="compare-bar" hidden>
         <span class="hs-compare-count" id="compare-count">0 selected</span>
-        <button class="hs-compare-btn" id="compare-btn" disabled>
-          Compare health →
-        </button>
+        <button class="hs-compare-btn" id="compare-btn" disabled>Compare health →</button>
       </div>
 
-      <!-- Populated at runtime by loadHistory() → GET /history -->
       <ul class="hs-list" id="hs-list" role="list">
         <li class="hs-item hs-item--placeholder">
           <span class="hs-item-text">Loading history…</span>
@@ -84,13 +74,10 @@
       <div class="hs-footer">
         <p class="hs-footer-note">Select 2+ conversations<br />to compare health progress</p>
       </div>
-
     </aside>
 
-
-    <!-- ── CHAT AREA ─────────────────────────────────────────── -->
+    <!-- CHAT AREA -->
     <main class="chat-page-main" id="chat-main">
-
       <div class="chat-card" role="region" aria-label="Chat with Cura">
 
         <div class="chat-header">
@@ -101,10 +88,10 @@
           <span class="chat-header-right">Powered by AI</span>
         </div>
 
-        <!-- Messages — hidden until user sends -->
+        <!-- Messages -->
         <div class="chat-messages" id="chat-messages" role="log" aria-live="polite"></div>
 
-        <!-- Compare report panel — injected by runCompare() → POST /compare -->
+        <!-- Compare report panel -->
         <div class="compare-panel" id="compare-panel" hidden>
           <div class="compare-panel-header">
             <span class="compare-panel-icon">✦</span>
@@ -117,57 +104,62 @@
           <div class="compare-report-body" id="compare-report-body"></div>
         </div>
 
-        <!-- Input — centred before send, shrinks to bar after, disappears when done -->
+        <!-- Input area -->
         <div class="chat-input-area" id="input-area">
 
           <div class="input-prompt" id="input-prompt">
             <p class="input-prompt-eyebrow">Ask Cura anything</p>
             <h2 class="input-prompt-headline">What can I help you <em>with?</em></h2>
             <p class="input-prompt-sub">
-              Type your question or paste your prescription text below.
+              Type your question, paste prescription text, or upload a prescription image.
+              Works for both humans and pets 🐾
             </p>
           </div>
 
-          <div class="input-row">
+          <!-- Image preview (shown when file is selected) -->
+          <div id="image-preview-wrap" style="display:none"></div>
 
+          <div class="input-row">
             <label for="chat-input" class="sr-only">Your message</label>
             <input
               type="text" id="chat-input" class="chat-input"
-              placeholder="Describe your symptoms or paste a prescription…"
-              autocomplete="off" maxlength="500"
+              placeholder="Describe symptoms, paste prescription, or upload image…"
+              autocomplete="off" maxlength="1000"
             />
+
+            <!-- Image upload button -->
+            <label class="upload-btn" id="upload-btn" title="Upload prescription image">
+              📎
+              <input type="file" id="image-input" accept="image/*,application/pdf" aria-label="Upload prescription image" />
+            </label>
+
             <button id="send-btn" class="send-btn" aria-label="Send message">&#10148;</button>
           </div>
 
         </div>
 
-        <!-- Shown after response is received -->
+        <!-- Done bar -->
         <div class="chat-done" id="chat-done" hidden>
           <span class="chat-done-icon">✦</span>
           <p class="chat-done-text">Response complete</p>
           <a href="/chatAI" class="chat-done-link">Ask another question →</a>
         </div>
 
-      </div><!-- /chat-card -->
-
+      </div>
     </main>
 
-  </div><!-- /app-shell -->
+  </div>
 
   <div class="chat-page-hint">
     Cura is an AI assistant · Responses are not medical advice · &copy; <span id="year"></span> Cura
   </div>
 
 
-  <!-- ══════════════════════════════════════════════════════════
-       SCRIPT
-  ══════════════════════════════════════════════════════════ -->
   <script>
-
-    /* ── Misc ───────────────────────────────────────────────── */
+    /* ── Misc ── */
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    /* ── DOM refs ───────────────────────────────────────────── */
+    /* ── DOM refs ── */
     const navbar            = document.getElementById('navbar');
     const navToggle         = document.getElementById('nav-toggle');
     const navLinks          = document.getElementById('nav-links');
@@ -185,39 +177,110 @@
     const comparePanel      = document.getElementById('compare-panel');
     const compareBody       = document.getElementById('compare-report-body');
     const comparePanelClose = document.getElementById('compare-panel-close');
+    const imageInput        = document.getElementById('image-input');
+    const uploadBtn         = document.getElementById('upload-btn');
+    const imagePreviewWrap  = document.getElementById('image-preview-wrap');
+    const themeToggle       = document.getElementById('theme-toggle');
 
-    /* ── Navbar shrink on scroll ────────────────────────────── */
+    /* ── Navbar scroll ── */
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 20);
     }, { passive: true });
 
-    /* ── Mobile nav ─────────────────────────────────────────── */
+    /* ── Mobile nav ── */
     navToggle.addEventListener('click', () => {
       const open = navLinks.classList.toggle('open');
       navToggle.classList.toggle('open', open);
       navToggle.setAttribute('aria-expanded', String(open));
     });
 
+    /* ════════════════════════════════════════════════════════
+       THEME TOGGLE (dark / light)
+    ════════════════════════════════════════════════════════ */
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      themeToggle.textContent = theme === 'light' ? '🌙' : '☀️';
+      themeToggle.title = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+      localStorage.setItem('cura_theme', theme);
+    }
+
+    const savedTheme = localStorage.getItem('cura_theme') || 'dark';
+    applyTheme(savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    });
 
     /* ════════════════════════════════════════════════════════
-       SIDEBAR COLLAPSE / EXPAND
+       SIDEBAR COLLAPSE
     ════════════════════════════════════════════════════════ */
     let sidebarOpen = sessionStorage.getItem('cura_sidebar') !== '0';
-
     function setSidebar(open) {
       sidebarOpen = open;
       appShell.classList.toggle('sidebar-collapsed', !open);
       sidebarToggle.setAttribute('aria-expanded', String(open));
       sessionStorage.setItem('cura_sidebar', open ? '1' : '0');
     }
-
     setSidebar(sidebarOpen);
     sidebarToggle.addEventListener('click', () => setSidebar(!sidebarOpen));
 
+    /* ════════════════════════════════════════════════════════
+       IMAGE UPLOAD HANDLING
+    ════════════════════════════════════════════════════════ */
+    let selectedFile = null;
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (!file) return;
+      selectedFile = file;
+      uploadBtn.classList.add('has-image');
+      showImagePreview(file);
+    });
+
+    function showImagePreview(file) {
+      imagePreviewWrap.style.display = 'block';
+      imagePreviewWrap.innerHTML = '';
+
+      const pill = document.createElement('div');
+      pill.className = 'image-preview-pill';
+
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Preview';
+        pill.appendChild(img);
+      } else {
+        const icon = document.createElement('span');
+        icon.textContent = '📄';
+        pill.appendChild(icon);
+      }
+
+      const name = document.createElement('span');
+      name.textContent = file.name;
+      pill.appendChild(name);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'image-preview-remove';
+      removeBtn.textContent = '✕';
+      removeBtn.title = 'Remove image';
+      removeBtn.addEventListener('click', clearImage);
+      pill.appendChild(removeBtn);
+
+      imagePreviewWrap.appendChild(pill);
+    }
+
+    function clearImage() {
+      selectedFile = null;
+      imageInput.value = '';
+      uploadBtn.classList.remove('has-image');
+      imagePreviewWrap.style.display = 'none';
+      imagePreviewWrap.innerHTML = '';
+    }
 
     /* ════════════════════════════════════════════════════════
        HISTORY  —  GET /history
-       Session-scoped: each user only sees their own history.
     ════════════════════════════════════════════════════════ */
     async function loadHistory() {
       try {
@@ -235,9 +298,7 @@
         hsList.innerHTML = '<li class="hs-item hs-item--empty">No past conversations yet.</li>';
         return;
       }
-
       hsList.innerHTML = '';
-
       convos.forEach(convo => {
         const li = document.createElement('li');
         li.className  = 'hs-item';
@@ -255,7 +316,6 @@
           </label>`;
         hsList.appendChild(li);
       });
-
       hsList.querySelectorAll('.hs-checkbox').forEach(cb => {
         cb.addEventListener('change', onCheckboxChange);
       });
@@ -264,17 +324,14 @@
     function onCheckboxChange() {
       const checked = [...hsList.querySelectorAll('.hs-checkbox:checked')];
       const count   = checked.length;
-
-      compareBar.hidden        = count < 2;
-      compareBtn.disabled      = count < 2;
+      compareBar.hidden   = count < 2;
+      compareBtn.disabled = count < 2;
       compareCount.textContent = `${count} selected`;
-
       hsList.querySelectorAll('.hs-item').forEach(li => {
         const cb = li.querySelector('.hs-checkbox');
         li.classList.toggle('hs-item--checked', cb && cb.checked);
       });
     }
-
 
     /* ════════════════════════════════════════════════════════
        COMPARE  —  POST /compare
@@ -282,14 +339,10 @@
     async function runCompare() {
       const selectedIds = [...hsList.querySelectorAll('.hs-checkbox:checked')]
                             .map(cb => cb.dataset.id);
-
       if (selectedIds.length < 2) return;
 
       comparePanel.hidden   = false;
-      compareBody.innerHTML = `
-        <div class="typing compare-typing">
-          <span></span><span></span><span></span>
-        </div>`;
+      compareBody.innerHTML = `<div class="typing compare-typing"><span></span><span></span><span></span></div>`;
       comparePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
@@ -298,13 +351,9 @@
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ ids: selectedIds }),
         });
-
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
-        compareBody.style.whiteSpace = 'pre-wrap';
-        compareBody.textContent      = data.report;
-
+        compareBody.innerHTML = data.report;   /* HTML from markdown_to_html() */
       } catch (err) {
         console.error('[Cura] Compare error:', err);
         compareBody.textContent = 'Could not load comparison. Please try again.';
@@ -312,19 +361,16 @@
     }
 
     compareBtn.addEventListener('click', runCompare);
-
     comparePanelClose.addEventListener('click', () => {
       comparePanel.hidden   = true;
       compareBody.innerHTML = '';
     });
 
-
     /* ════════════════════════════════════════════════════════
        CHAT  —  POST /chat
-       Sends message as JSON.
     ════════════════════════════════════════════════════════ */
 
-    function appendMessage(text, role) {
+    function appendMessage(htmlContent, role, petType) {
       const row    = document.createElement('div');
       row.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
 
@@ -336,8 +382,20 @@
       const bubble  = document.createElement('div');
       bubble.className = 'msg-bubble';
 
-      const textNode = document.createTextNode(text);
-      bubble.appendChild(textNode);
+      if (role === 'ai') {
+        /* Pet badge */
+        if (petType === 'pet') {
+          const badge = document.createElement('div');
+          badge.className = 'pet-badge';
+          badge.innerHTML = '🐾 Pet prescription';
+          bubble.appendChild(badge);
+        }
+        /* AI responses are pre-rendered HTML from markdown_to_html() */
+        bubble.insertAdjacentHTML('beforeend', htmlContent);
+      } else {
+        /* User messages are plain text — escape for safety */
+        bubble.textContent = htmlContent;
+      }
 
       row.append(avatar, bubble);
       messages.appendChild(row);
@@ -376,31 +434,43 @@
 
     async function sendMessage() {
       const text = chatInput.value.trim();
-      if (!text) return;
+      if (!text && !selectedFile) return;
 
+      const displayText = text || `📎 ${selectedFile.name}`;
       transitionTo('sent');
-      appendMessage(text, 'user');
+      appendMessage(displayText, 'user');
       showTyping();
 
       try {
-        const res = await fetch('/chat', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ message: text }),
-        });
+        let res;
+
+        if (selectedFile) {
+          /* Send as multipart/form-data when there is an image */
+          const form = new FormData();
+          form.append('message', text);
+          form.append('image', selectedFile);
+          res = await fetch('/chat', { method: 'POST', body: form });
+        } else {
+          /* Plain JSON for text-only messages */
+          res = await fetch('/chat', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ message: text }),
+          });
+        }
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
 
         hideTyping();
-        appendMessage(data.response, 'ai');
+        appendMessage(data.response, 'ai', data.patient_type);
 
       } catch (err) {
         console.error('[Cura] Chat error:', err);
         hideTyping();
-        appendMessage('Something went wrong. Please try again.', 'ai');
+        appendMessage('<p>Something went wrong. Please try again.</p>', 'ai');
       } finally {
+        clearImage();
         transitionTo('done');
       }
     }
@@ -410,20 +480,15 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
-
-    /* ── XSS helper ─────────────────────────────────────────── */
+    /* ── XSS helper ── */
     function escapeHtml(str) {
       return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-
-    /* ── Init ───────────────────────────────────────────────── */
+    /* ── Init ── */
     loadHistory();
-
   </script>
 
 </body>
