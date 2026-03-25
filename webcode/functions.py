@@ -235,18 +235,13 @@ def call_gemini_for_comparison(timeline: str) -> str:
 
     try:
         response = client.models.generate_content(
-            model    = "gemini-1.5-flash",
-            contents = [
-                types.Content(
-                    role  = "user",
-                    parts = [
-                        types.Part.from_text(_COMPARISON_SYSTEM),
-                        types.Part.from_text(user_turn),
-                    ],
-                )
-            ],
-            config = types.GenerateContentConfig(temperature=0.3),
-        )
+        model="gemini-3-flash-preview",
+        contents=user_turn,
+        config=types.GenerateContentConfig(
+            temperature=0.4,
+            system_instruction=_RESPONSE_SYSTEM
+        ),
+    )
         return response.text or "No comparison report generated."
     except Exception as exc:
         return f"Error generating comparison: {exc}"
