@@ -81,7 +81,7 @@ def call_gemini(text: str | None = None, image_path: str | None = None) -> dict:
             parts.append(_image_part(image_path))
 
         response = client.models.generate_content(
-            model    = "gemini-1.5-flash",
+            model    = "gemini-2.5-pro",
             contents = parts,
             config   = types.GenerateContentConfig(temperature=0.2),
         )
