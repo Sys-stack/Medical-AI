@@ -6,9 +6,10 @@ from urllib.parse import quote
 
 import requests
 from google import genai
+from google.genai import types
 
 # ── Config ─────────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY")
 OPENFDA_API_KEY = os.environ.get("OPENFDA_API_KEY")
 
 if not GEMINI_API_KEY:
@@ -17,205 +18,305 @@ if not GEMINI_API_KEY:
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 OPENFDA_BASE = "https://api.fda.gov"
-NLM_BASE = "https://rxnav.nlm.nih.gov/REST"
+NLM_BASE     = "https://rxnav.nlm.nih.gov/REST"
 
 # ════════════════════════════════════════════════════════════════════════
-# STEP 1 — GEMINI (Prescription Extraction)
+# STEP 1 — GEMINI  (Prescription Extraction)
 # ════════════════════════════════════════════════════════════════════════
 
 _EXTRACTION_PROMPT = """
 You are a STRICT medical prescription parser.
 
-Return ONLY valid JSON.
+Return ONLY valid JSON — no markdown, no explanation.
 
 FORMAT:
 {
-  "summary": "short summary",
-  "drugs": ["drug names"]
+  "summary": "short summary of the prescription",
+  "drugs": ["drug name 1", "drug name 2"]
 }
 
 Rules:
-- No markdown
-- No explanation
-- Only real drug names
+- Only real drug / medicine names in the drugs list.
+- If no drugs are found, return an empty list for drugs.
 """
 
+# Maps common image extensions to the MIME types expected by the genai SDK.
+_MIME_MAP = {
+    "jpg":  "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png":  "image/png",
+    "webp": "image/webp",
+    "gif":  "image/gif",
+}
 
-def encode_image(image_path: str):
-    with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+
+def _image_part(image_path: str) -> types.Part:
+    """
+    Read an image from disk and wrap it in a genai Part so Gemini can see it.
+    Uses the proper multimodal API instead of embedding raw base64 in a string.
+    """
+    ext      = image_path.rsplit(".", 1)[-1].lower()
+    mime     = _MIME_MAP.get(ext, "image/jpeg")
+    with open(image_path, "rb") as fh:
+        data = fh.read()
+    return types.Part.from_bytes(data=data, mime_type=mime)
 
 
-def call_gemini(text=None, image_path=None):
+def call_gemini(text: str | None = None, image_path: str | None = None) -> dict:
+    """
+    Step 1 — extract a structured { summary, drugs } dict from a prescription.
+
+    Accepts plain text, an image path, or both.
+    Returns a dict with keys  'summary'  and  'drugs'  on success,
+    or  { 'error': <message> }  on failure.
+    """
     try:
-        content = _EXTRACTION_PROMPT + "\n"
+        # Build the content parts list
+        parts: list = [_EXTRACTION_PROMPT]
 
         if text:
-            content += f"\nPrescription:\n{text}\n"
+            parts.append(f"\nPrescription text:\n{text}\n")
 
         if image_path:
-            b64 = encode_image(image_path)
-            content += f"\n[Image Base64]: {b64[:100]}...\n"
+            parts.append(_image_part(image_path))
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=content,
-            config={"temperature": 0.2},
+            model    = "gemini-1.5-flash",
+            contents = parts,
+            config   = types.GenerateContentConfig(temperature=0.2),
         )
 
-        raw = response.text
+        raw = response.text or ""
 
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        # The model should return pure JSON, but strip any accidental markdown fences.
+        clean = re.sub(r"```(?:json)?|```", "", raw).strip()
+        match = re.search(r"\{.*\}", clean, re.DOTALL)
         if match:
             return json.loads(match.group())
 
+        # Fallback: return whatever the model said as the summary.
         return {"summary": raw[:300], "drugs": []}
 
-    except Exception as e:
-        return {"error": str(e)}
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 # ════════════════════════════════════════════════════════════════════════
-# STEP 2 — DATA FETCH (OpenFDA + NLM)
+# STEP 2 — DATA FETCH  (OpenFDA + NLM via requests — external REST APIs)
 # ════════════════════════════════════════════════════════════════════════
 
-
-def build_endpoints(drug_name: str):
+def build_endpoints(drug_name: str) -> dict:
     return {
-        "openfda_url": f"{OPENFDA_BASE}/drug/label.json?search=openfda.generic_name:\"{drug_name}\"&limit=3",
+        "openfda_url": (
+            f"{OPENFDA_BASE}/drug/label.json"
+            f"?search=openfda.generic_name:\"{drug_name}\"&limit=3"
+        ),
         "nlm_url": f"{NLM_BASE}/rxcui.json?name={quote(drug_name)}&search=1",
     }
 
 
-def fetch_openfda(url: str):
+def fetch_openfda(url: str) -> dict:
     if OPENFDA_API_KEY:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}api_key={OPENFDA_API_KEY}"
 
-    res = requests.get(url, timeout=10)
-    if res.status_code != 200:
-        return {"error": res.text}
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code != 200:
+            return {"error": res.text[:200]}
+        return {"parsed": parse_openfda(res.json())}
+    except Exception as exc:
+        return {"error": str(exc)}
 
-    raw = res.json()
-    return {"parsed": parse_openfda(raw)}
 
-
-def parse_openfda(raw):
+def parse_openfda(raw: dict) -> list:
     results = raw.get("results", [])
-    parsed = []
-
+    parsed  = []
     for r in results:
         openfda = r.get("openfda", {})
         parsed.append({
-            "brand": openfda.get("brand_name", ["N/A"])[0],
-            "generic": openfda.get("generic_name", ["N/A"])[0],
-            "purpose": r.get("purpose", ["N/A"])[0] if r.get("purpose") else "N/A",
-            "warnings": (r.get("warnings", ["N/A"])[0][:200] if r.get("warnings") else "N/A"),
+            "brand":    openfda.get("brand_name",   ["N/A"])[0],
+            "generic":  openfda.get("generic_name", ["N/A"])[0],
+            "purpose":  r.get("purpose",  ["N/A"])[0] if r.get("purpose")  else "N/A",
+            "warnings": r.get("warnings", ["N/A"])[0][:200] if r.get("warnings") else "N/A",
         })
-
     return parsed
 
 
-def fetch_nlm(url: str):
-    res = requests.get(url, timeout=10)
-    if res.status_code != 200:
-        return {"error": "NLM failed"}
+def fetch_nlm(url: str) -> dict:
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code != 200:
+            return {"error": "NLM request failed"}
 
-    raw = res.json()
-    ids = raw.get("idGroup", {}).get("rxnormId", [])
+        ids = res.json().get("idGroup", {}).get("rxnormId", [])
+        if not ids:
+            return {"error": "No RxCUI found"}
 
-    if not ids:
-        return {"error": "No RxCUI"}
+        rxcui     = ids[0]
+        props_url = f"{NLM_BASE}/rxcui/{rxcui}/allProperties.json?prop=all"
+        props_res = requests.get(props_url, timeout=10)
+        if props_res.status_code != 200:
+            return {"error": "NLM properties request failed"}
 
-    rxcui = ids[0]
-    props_url = f"{NLM_BASE}/rxcui/{rxcui}/allProperties.json?prop=all"
-    props = requests.get(props_url).json()
-
-    return {"parsed": parse_nlm(props, rxcui)}
+        return {"parsed": parse_nlm(props_res.json(), rxcui)}
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
-def parse_nlm(raw, rxcui):
-    props = raw.get("propConceptGroup", {}).get("propConcept", [])
+def parse_nlm(raw: dict, rxcui: str) -> dict:
+    props    = raw.get("propConceptGroup", {}).get("propConcept", [])
     prop_map = {p["propName"]: p["propValue"] for p in props}
-
     return {
-        "rxcui": rxcui,
-        "name": prop_map.get("RxNorm Name", "N/A"),
+        "rxcui":   rxcui,
+        "name":    prop_map.get("RxNorm Name",    "N/A"),
         "synonym": prop_map.get("RxNorm Synonym", "N/A"),
     }
 
 
-def data_fetch(endpoints):
+def data_fetch(endpoints: dict) -> dict:
     return {
-        "openfda": fetch_openfda(endpoints.get("openfda_url")),
-        "nlm": fetch_nlm(endpoints.get("nlm_url")),
+        "openfda": fetch_openfda(endpoints.get("openfda_url", "")),
+        "nlm":     fetch_nlm(endpoints.get("nlm_url", "")),
     }
 
 
 # ════════════════════════════════════════════════════════════════════════
-# STEP 3 — GEMINI (User-Friendly Response)
+# STEP 3 — GEMINI  (Patient-Friendly Response)
 # ════════════════════════════════════════════════════════════════════════
 
-_RESPONSE_PROMPT = """
-You are a friendly health assistant.
-Explain medical info in simple language.
-Be clear and short.
-Always add: consult a doctor.
-"""
+_RESPONSE_SYSTEM = (
+    "You are Cura, a friendly health assistant. "
+    "Explain medical information in simple, clear language a patient can understand. "
+    "Keep the reply concise. Always remind the user to consult a doctor."
+)
 
 
-def call_gemini_for_response(user_message, summary, drug_details):
-    context = ""
-
+def call_gemini_for_response(
+    user_message: str,
+    summary: str,
+    drug_details: dict,
+) -> str:
+    """
+    Step 3 — produce a patient-friendly explanation of the prescription.
+    """
+    # Summarise what we know about each drug from OpenFDA.
+    drug_context = ""
     for drug, data in drug_details.items():
         fda = data.get("openfda", {}).get("parsed", [])
         if fda:
-            first = fda[0]
-            context += f"{drug}: {first.get('purpose')} | Warning: {first.get('warnings')}\n"
+            first       = fda[0]
+            drug_context += (
+                f"• {drug}: purpose — {first.get('purpose')} | "
+                f"warning — {first.get('warnings')}\n"
+            )
 
-    prompt = f"""
-{_RESPONSE_PROMPT}
-
-User: {user_message}
-Summary: {summary}
-Drugs:\n{context}
-"""
+    user_turn = (
+        f"User question / message: {user_message or 'Please explain this prescription.'}\n\n"
+        f"Prescription summary: {summary}\n\n"
+        f"Drug information:\n{drug_context or 'No drug data available.'}"
+    )
 
     try:
-        res = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt,
-            config={"temperature": 0.4},
+        response = client.models.generate_content(
+            model    = "gemini-1.5-flash",
+            contents = [
+                types.Content(
+                    role  = "user",
+                    parts = [
+                        types.Part.from_text(_RESPONSE_SYSTEM),
+                        types.Part.from_text(user_turn),
+                    ],
+                )
+            ],
+            config = types.GenerateContentConfig(temperature=0.4),
         )
-        return res.text
-    except Exception as e:
-        return str(e)
+        return response.text or "No response generated."
+    except Exception as exc:
+        return f"Error generating response: {exc}"
 
 
 # ════════════════════════════════════════════════════════════════════════
-# PIPELINE
+# STEP 4 — GEMINI  (Health-Progress Comparison)
 # ════════════════════════════════════════════════════════════════════════
 
+_COMPARISON_SYSTEM = (
+    "You are Cura, a health-progress analyst. "
+    "You will be given a chronological timeline of a patient's health conversations. "
+    "Analyse the progression: highlight improvements, recurring issues, and any concerns. "
+    "Write clearly so a non-medical reader can understand. "
+    "Always recommend consulting a healthcare professional."
+)
 
-def process_prescription(text=None, image_path=None):
+
+def call_gemini_for_comparison(timeline: str) -> str:
+    """
+    Step 4 — compare multiple past conversations and produce a health-progress report.
+
+    Parameters
+    ----------
+    timeline : str
+        Plain-text chronological timeline built by classes.build_timeline().
+
+    Returns
+    -------
+    str — the AI-generated health-progress report.
+    """
+    user_turn = (
+        "Here is the patient's health conversation timeline in chronological order:\n\n"
+        f"{timeline}\n\n"
+        "Please analyse the progression of the patient's condition and write a clear report."
+    )
+
+    try:
+        response = client.models.generate_content(
+            model    = "gemini-1.5-flash",
+            contents = [
+                types.Content(
+                    role  = "user",
+                    parts = [
+                        types.Part.from_text(_COMPARISON_SYSTEM),
+                        types.Part.from_text(user_turn),
+                    ],
+                )
+            ],
+            config = types.GenerateContentConfig(temperature=0.3),
+        )
+        return response.text or "No comparison report generated."
+    except Exception as exc:
+        return f"Error generating comparison: {exc}"
+
+
+# ════════════════════════════════════════════════════════════════════════
+# CONVENIENCE PIPELINE  (used by mainbackend.py's /chat route)
+# ════════════════════════════════════════════════════════════════════════
+
+def process_prescription(text: str | None = None, image_path: str | None = None) -> dict:
+    """
+    Full pipeline: extract → fetch drug data → generate reply.
+    Returns a dict with keys: summary, drugs, details, response.
+    """
     step1 = call_gemini(text, image_path)
-
     if "error" in step1:
         return step1
 
-    summary = step1.get("summary", "")
-    drugs = step1.get("drugs", [])
-
+    summary      = step1.get("summary", "")
+    drugs        = step1.get("drugs", [])
     drug_details = {}
-    for d in drugs:
-        endpoints = build_endpoints(d)
-        drug_details[d] = data_fetch(endpoints)
 
-    response = call_gemini_for_response(text or "Explain this", summary, drug_details)
+    for drug in drugs:
+        endpoints          = build_endpoints(drug)
+        drug_details[drug] = data_fetch(endpoints)
+
+    reply = call_gemini_for_response(
+        user_message = text or "Explain this prescription.",
+        summary      = summary,
+        drug_details = drug_details,
+    )
 
     return {
-        "summary": summary,
-        "drugs": drugs,
-        "details": drug_details,
-        "response": response,
+        "summary":  summary,
+        "drugs":    drugs,
+        "details":  drug_details,
+        "response": reply,
     }

@@ -14,16 +14,14 @@ from functions import (
     call_gemini,
     build_endpoints,
     call_gemini_for_response,
-    call_gemini_for_comparison,
-    GEMINI_URL,
-    GEMINI_API_KEY,
+    call_gemini_for_comparison,   # now defined in functions.py
 )
 
 # ── Flask app ─────────────────────────────────────────────────
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('commkey', 'dev-secret-key-change-in-prod')
-app.config['DEBUG']      = True
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024   # 16 MB upload limit
+app.config['SECRET_KEY']            = os.environ.get('commkey', 'dev-secret-key-change-in-prod')
+app.config['DEBUG']                 = True
+app.config['MAX_CONTENT_LENGTH']    = 16 * 1024 * 1024   # 16 MB upload limit
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
@@ -53,8 +51,10 @@ def _get_user_convos() -> dict[str, convoHistory]:
 
 
 def _allowed_image(filename: str) -> bool:
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    return (
+        '.' in filename
+        and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    )
 
 
 # =============================================================
@@ -82,8 +82,8 @@ def chatAI():
 # Frontend: sendMessage() in chat.html
 #
 # Multipart fields:
-#   message : str       — the user's text
-#   image   : file      — optional image (prescription scan, lab result, etc.)
+#   message : str  — the user's text
+#   image   : file — optional image (prescription scan, lab result, etc.)
 #
 # Returns : { "response": "<AI reply>", "convo_id": "<id>" }
 # =============================================================
@@ -130,8 +130,10 @@ def chat():
     # ──────────────────────────────────────────────────────────
     try:
         # Step A: extract summary + drug list from prescription
-        gemini_result = call_gemini(text=message if message else None,
-                                    image_path=image_path)
+        gemini_result = call_gemini(
+            text       = message if message else None,
+            image_path = image_path,
+        )
 
         if "error" in gemini_result:
             response_text = (
@@ -145,8 +147,8 @@ def chat():
             # Step B: fetch OpenFDA + NLM data for every identified drug
             drug_details: dict = {}
             for drug in drug_list:
-                endpoints            = build_endpoints(drug)
-                drug_details[drug]   = data_fetch(endpoints)
+                endpoints          = build_endpoints(drug)
+                drug_details[drug] = data_fetch(endpoints)
 
             # Step C: generate patient-friendly explanation
             response_text = call_gemini_for_response(
