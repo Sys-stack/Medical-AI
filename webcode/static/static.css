@@ -57,7 +57,7 @@ body{font-family:var(--font-body);font-weight:300;font-size:16px;line-height:1.7
 .theme-toggle:active{transform:scale(.94)}
 
 /* NAVBAR */
-.navbar{position:fixed;top:0;left:0;right:0;z-index:200;padding:22px 0;background:var(--navbar-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-border);transition:padding var(--dur-base) var(--ease),background var(--dur-base) var(--ease)}
+.navbar{position:fixed;top:0;left:0;right:0;z-index:200;padding:2px 0;background:var(--navbar-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-border);transition:padding var(--dur-base) var(--ease),background var(--dur-base) var(--ease)}
 .navbar.scrolled{padding:14px 0;background:var(--navbar-scrolled)}
 .navbar .container{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .nav-logo{font-family:var(--font-display);font-size:1.85rem;font-weight:600;letter-spacing:.08em;color:var(--text-light);text-decoration:none;transition:color var(--dur-base) var(--ease)}
