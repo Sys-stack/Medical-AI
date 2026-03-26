@@ -3,9 +3,6 @@ import json
 import re
 import base64
 from urllib.parse import quote
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import requests
 from google import genai
