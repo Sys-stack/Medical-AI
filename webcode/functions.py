@@ -408,6 +408,79 @@ def call_gemini_for_comparison(timeline: str) -> str:
 
 
 # ════════════════════════════════════════════════════════════════════════
+# STEP 5 — GEMINI  (Body-Map Data Extraction)
+# ════════════════════════════════════════════════════════════════════════
+
+_BODY_MAP_SYSTEM = """
+You are a STRICT medical data extractor for a body-map visualisation feature.
+
+Return ONLY valid JSON — no markdown, no explanation, no code fences.
+
+FORMAT:
+{
+  "body_part": "<one of the exact IDs listed below, or null>",
+  "condition": "<short plain-english condition name, e.g. 'Pneumonia', 'Sinusitis'>",
+  "severity": <float 0.0–1.0, where 1.0 = severe / newly diagnosed, 0.0 = fully healed>,
+  "treatment_days": <integer total days of the treatment course, or null if unknown>,
+  "days_elapsed": <integer days already taken/elapsed, or 0 if just started>,
+  "show_map": <true if a specific anatomical location can be identified, false otherwise>
+}
+
+VALID body_part IDs (use exactly one, or null):
+  "head", "neck", "left_lung", "right_lung", "heart", "stomach", "liver",
+  "left_kidney", "right_kidney", "intestines", "left_shoulder", "right_shoulder",
+  "left_elbow", "right_elbow", "left_hand", "right_hand", "left_knee", "right_knee",
+  "left_foot", "right_foot", "spine", "throat", "nose", "left_ear", "right_ear",
+  "eye_left", "eye_right", "skin", "bladder"
+
+Rules:
+- Set show_map=false if the message is a general question (no specific body part / diagnosis).
+- severity must represent current state: if treatment_days and days_elapsed are known,
+  calculate severity = max(0.0, 1.0 - days_elapsed / treatment_days).
+- If days_elapsed >= treatment_days, set severity=0.05 (nearly healed visual).
+- Never invent information. If uncertain, set show_map=false.
+"""
+
+
+def call_gemini_for_body_map(prompt: str, summary: str, drug_details: dict) -> dict:
+    """
+    Step 5 — extract body-map data from the prescription context.
+    Returns a dict with keys: body_part, condition, severity, treatment_days,
+    days_elapsed, show_map.
+    Falls back to {"show_map": false} on any error.
+    """
+    drug_context = ""
+    for drug, data in drug_details.items():
+        fda = data.get("openfda", {}).get("parsed", [])
+        if fda:
+            first = fda[0]
+            drug_context += f"• {drug}: purpose — {first.get('purpose')}\n"
+
+    user_turn = (
+        f"User message: {prompt or '(none)'}\n\n"
+        f"Prescription summary: {summary or '(none)'}\n\n"
+        f"Drug information:\n{drug_context or 'None available.'}"
+    )
+
+    try:
+        raw   = _generate_with_fallback(user_turn, temperature=0.1, system_instruction=_BODY_MAP_SYSTEM)
+        clean = re.sub(r"```(?:json)?|```", "", raw).strip()
+        match = re.search(r"\{.*\}", clean, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
+            # Ensure numeric bounds
+            parsed["severity"]     = max(0.0, min(1.0, float(parsed.get("severity", 0.5))))
+            parsed["show_map"]     = bool(parsed.get("show_map", False))
+            parsed["treatment_days"] = parsed.get("treatment_days")
+            parsed["days_elapsed"] = int(parsed.get("days_elapsed", 0))
+            return parsed
+    except Exception:
+        pass
+
+    return {"show_map": False}
+
+
+# ════════════════════════════════════════════════════════════════════════
 # CONVENIENCE PIPELINE
 # ════════════════════════════════════════════════════════════════════════
 

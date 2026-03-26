@@ -301,7 +301,153 @@ body{font-family:var(--font-body);font-weight:300;font-size:16px;line-height:1.7
 .compare-report-body .md-hr{border:none;border-top:1px solid var(--glass-border);margin:10px 0}
 .compare-report-body .md-code{font-family:monospace;font-size:.82em;background:rgba(226,191,121,.10);border:1px solid rgba(226,191,121,.16);border-radius:4px;padding:1px 5px}
 
-/* RESPONSIVE (chat page) */
+/* ════════════════════════════════════════════════════════════
+   BODY MAP CARD
+   Rendered below the AI message bubble after /chat responds.
+════════════════════════════════════════════════════════════ */
+.body-map-wrap{
+  padding:0 0 18px 48px; /* align with AI bubble (avatar width = 36px + gap 12px) */
+  animation:fadeUp .55s var(--ease) .1s both;
+}
+
+.body-map-card{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  box-shadow:var(--glass-shadow);
+  max-width:560px;
+}
+
+/* Header */
+.bm-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:16px 20px 14px;
+  border-bottom:1px solid var(--glass-border);
+}
+.bm-icon{font-size:1.1rem;flex-shrink:0}
+.bm-eyebrow{
+  font-size:.62rem;font-weight:500;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:2px;
+}
+.bm-condition{
+  font-size:.90rem;font-weight:400;color:var(--text-light);
+}
+.bm-region-label{
+  font-size:.78rem;color:rgba(231,232,239,.40);
+}
+[data-theme="light"] .bm-region-label{color:rgba(30,30,30,.40)}
+
+/* Severity badge */
+.bm-severity-badge{
+  margin-left:auto;flex-shrink:0;
+  font-size:.64rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  padding:3px 10px;border-radius:var(--radius-pill);
+}
+.bm-sev-severe  {background:rgba(220,50,50,.18); border:1px solid rgba(220,50,50,.35);  color:#e87070}
+.bm-sev-moderate{background:rgba(226,150,50,.18);border:1px solid rgba(226,150,50,.35); color:#e8a050}
+.bm-sev-mild    {background:rgba(100,190,80,.18); border:1px solid rgba(100,190,80,.35); color:#78d460}
+.bm-sev-healed  {background:rgba(60,200,120,.18); border:1px solid rgba(60,200,120,.35); color:#4ecc88}
+
+/* Body: figure + stats */
+.bm-body{
+  display:flex;
+  gap:0;
+  align-items:flex-start;
+}
+
+/* SVG Figure */
+.bm-figure-wrap{
+  flex-shrink:0;
+  width:160px;
+  padding:18px 8px 18px 18px;
+  border-right:1px solid var(--glass-border);
+}
+.bm-figure-svg{
+  width:100%;
+  height:auto;
+  display:block;
+}
+
+/* Infection circle animation (CSS-driven glow pulse on the overlay) */
+.bm-inf-circle{
+  transition:r .8s var(--ease), opacity .8s var(--ease);
+}
+
+/* Stats panel */
+.bm-stats{
+  flex:1;
+  padding:18px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.bm-stat-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:8px;
+}
+.bm-stat-label{
+  font-size:.72rem;letter-spacing:.08em;
+  color:rgba(231,232,239,.40);
+  white-space:nowrap;
+}
+[data-theme="light"] .bm-stat-label{color:rgba(30,30,30,.42)}
+.bm-stat-value{
+  font-size:.80rem;font-weight:400;
+  color:var(--text-light);text-align:right;
+}
+
+/* Progress bar */
+.bm-progress-track{
+  width:100%;height:6px;
+  background:rgba(231,232,239,.07);
+  border-radius:var(--radius-pill);
+  overflow:hidden;
+  margin-top:4px;
+}
+.bm-progress-fill{
+  height:100%;border-radius:var(--radius-pill);
+  transition:width 1.2s cubic-bezier(.4,0,.2,1);
+  opacity:.85;
+}
+
+.bm-disclaimer{
+  margin-top:12px;
+  font-size:.64rem;line-height:1.55;
+  color:rgba(231,232,239,.22);
+}
+[data-theme="light"] .bm-disclaimer{color:rgba(30,30,30,.28)}
+
+/* Footer progress accent bar */
+.bm-footer-bar{
+  height:3px;
+  background:rgba(231,232,239,.05);
+  overflow:hidden;
+}
+.bm-footer-fill{
+  height:100%;
+  border-radius:0;
+  transition:width 1.4s cubic-bezier(.4,0,.2,1) .3s;
+}
+
+/* Responsive */
+@media(max-width:640px){
+  .body-map-wrap{padding-left:12px}
+  .bm-figure-wrap{width:120px}
+  .bm-body{flex-direction:column}
+  .bm-figure-wrap{border-right:none;border-bottom:1px solid var(--glass-border);width:100%;padding:14px 18px 10px}
+  .bm-figure-svg{max-width:140px;margin:0 auto}
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE (chat page)
+════════════════════════════════════════════════════════════ */
 @media(max-width:860px){.history-sidebar{width:240px}.app-shell.sidebar-collapsed .history-sidebar{width:0}}
 @media(max-width:640px){
   .history-sidebar{width:100%;position:absolute;z-index:50;height:100%}.app-shell.sidebar-collapsed .history-sidebar{width:0;opacity:0}

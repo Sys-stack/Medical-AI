@@ -465,6 +465,11 @@
         hideTyping();
         appendMessage(data.response, 'ai', data.patient_type);
 
+        /* ── Body Map: fetch and render if applicable ── */
+        if (data.convo_id) {
+          renderBodyMap(data.convo_id);
+        }
+
       } catch (err) {
         console.error('[Cura] Chat error:', err);
         hideTyping();
@@ -485,6 +490,224 @@
       return String(str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* ════════════════════════════════════════════════════════
+       BODY MAP  —  GET /body-map/<convo_id>
+       Fetches body-map metadata and renders the animated
+       infection-progress visualisation below the AI bubble.
+    ════════════════════════════════════════════════════════ */
+
+    /* Maps our body_part IDs → SVG region data
+       cx/cy = centre of the overlay circle, r = base radius  */
+    const BODY_REGIONS = {
+      head:           { cx: 200, cy: 62,  r: 28, label: 'Head'           },
+      neck:           { cx: 200, cy: 107, r: 14, label: 'Neck / Throat'  },
+      throat:         { cx: 200, cy: 107, r: 14, label: 'Throat'         },
+      nose:           { cx: 200, cy: 75,  r: 10, label: 'Nose'           },
+      left_ear:       { cx: 173, cy: 65,  r: 10, label: 'Left Ear'       },
+      right_ear:      { cx: 227, cy: 65,  r: 10, label: 'Right Ear'      },
+      eye_left:       { cx: 189, cy: 58,  r: 8,  label: 'Left Eye'       },
+      eye_right:      { cx: 211, cy: 58,  r: 8,  label: 'Right Eye'      },
+      left_lung:      { cx: 178, cy: 160, r: 26, label: 'Left Lung'      },
+      right_lung:     { cx: 222, cy: 160, r: 26, label: 'Right Lung'     },
+      heart:          { cx: 193, cy: 155, r: 18, label: 'Heart'          },
+      stomach:        { cx: 200, cy: 210, r: 22, label: 'Stomach'        },
+      liver:          { cx: 218, cy: 200, r: 20, label: 'Liver'          },
+      intestines:     { cx: 200, cy: 245, r: 28, label: 'Intestines'     },
+      bladder:        { cx: 200, cy: 280, r: 16, label: 'Bladder'        },
+      left_kidney:    { cx: 180, cy: 220, r: 14, label: 'Left Kidney'    },
+      right_kidney:   { cx: 220, cy: 220, r: 14, label: 'Right Kidney'   },
+      spine:          { cx: 200, cy: 215, r: 10, label: 'Spine'          },
+      left_shoulder:  { cx: 152, cy: 130, r: 18, label: 'Left Shoulder'  },
+      right_shoulder: { cx: 248, cy: 130, r: 18, label: 'Right Shoulder' },
+      left_elbow:     { cx: 135, cy: 195, r: 14, label: 'Left Elbow'     },
+      right_elbow:    { cx: 265, cy: 195, r: 14, label: 'Right Elbow'    },
+      left_hand:      { cx: 122, cy: 255, r: 14, label: 'Left Hand'      },
+      right_hand:     { cx: 278, cy: 255, r: 14, label: 'Right Hand'     },
+      left_knee:      { cx: 180, cy: 365, r: 16, label: 'Left Knee'      },
+      right_knee:     { cx: 220, cy: 365, r: 16, label: 'Right Knee'     },
+      left_foot:      { cx: 178, cy: 455, r: 14, label: 'Left Foot'      },
+      right_foot:     { cx: 222, cy: 455, r: 14, label: 'Right Foot'     },
+      skin:           { cx: 200, cy: 200, r: 45, label: 'Skin'           },
+    };
+
+    function buildBodySVG(region, severity, condition, treatmentDays, daysElapsed) {
+      const pct        = Math.round((1 - severity) * 100);
+      const daysLeft   = (treatmentDays != null)
+                           ? Math.max(0, treatmentDays - daysElapsed)
+                           : null;
+
+      /* Infection colour: red (severe) → amber → green (healed) */
+      const r = Math.round(220 * severity + 60  * (1 - severity));
+      const g = Math.round(40  * severity + 180 * (1 - severity));
+      const b = Math.round(40  * severity + 60  * (1 - severity));
+      const infColor = `rgb(${r},${g},${b})`;
+
+      /* Pulse ring visible only when still infected */
+      const pulseStyle = severity > 0.05
+        ? `animation: bm-pulse 2s ease-out infinite;`
+        : `display:none;`;
+
+      /* Progress bar width */
+      const barW = Math.round(pct);
+
+      /* Days label */
+      const daysLabel = daysLeft != null
+        ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} of treatment remaining`
+        : 'Treatment duration unknown';
+
+      /* Severity text */
+      const sevText = severity <= 0.05 ? 'Healed' :
+                      severity <= 0.3  ? 'Mild'   :
+                      severity <= 0.6  ? 'Moderate' : 'Severe';
+
+      const { cx, cy, r: br, label } = region;
+
+      return `
+<div class="body-map-card">
+  <div class="bm-header">
+    <span class="bm-icon">🫀</span>
+    <div>
+      <p class="bm-eyebrow">Internal Progress Map</p>
+      <p class="bm-condition">${escapeHtml(condition)} <span class="bm-region-label">· ${escapeHtml(label)}</span></p>
+    </div>
+    <span class="bm-severity-badge bm-sev-${sevText.toLowerCase()}">${sevText}</span>
+  </div>
+
+  <div class="bm-body">
+    <!-- SVG Human Figure -->
+    <div class="bm-figure-wrap">
+      <svg class="bm-figure-svg" viewBox="0 0 400 480" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="infGrad_${cx}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="${infColor}" stop-opacity="${(severity * 0.85 + 0.1).toFixed(2)}"/>
+            <stop offset="60%"  stop-color="${infColor}" stop-opacity="${(severity * 0.5).toFixed(2)}"/>
+            <stop offset="100%" stop-color="${infColor}" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="glow_${cx}" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="${Math.round(br * 0.45)}" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <style>
+            @keyframes bm-pulse {
+              0%   { r: ${br * 1.0}px; opacity: 0.7; }
+              70%  { r: ${br * 1.9}px; opacity: 0;   }
+              100% { r: ${br * 1.9}px; opacity: 0;   }
+            }
+          </style>
+        </defs>
+
+        <!-- Body silhouette -->
+        <!-- Head -->
+        <ellipse cx="200" cy="62" rx="28" ry="32" fill="none" stroke="var(--glass-border)" stroke-width="1.5"/>
+        <!-- Neck -->
+        <rect x="191" y="90" width="18" height="20" rx="4" fill="none" stroke="var(--glass-border)" stroke-width="1.5"/>
+        <!-- Torso -->
+        <path d="M152 110 Q145 140 140 280 Q165 295 200 295 Q235 295 260 280 Q255 140 248 110 Z"
+              fill="none" stroke="var(--glass-border)" stroke-width="1.5"/>
+        <!-- Left arm -->
+        <path d="M152 120 Q128 160 118 230 Q115 250 122 265"
+              fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- Right arm -->
+        <path d="M248 120 Q272 160 282 230 Q285 250 278 265"
+              fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- Left leg -->
+        <path d="M178 293 Q172 340 170 395 Q168 430 178 460"
+              fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- Right leg -->
+        <path d="M222 293 Q228 340 230 395 Q232 430 222 460"
+              fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+
+        <!-- Pulse ring (animated) -->
+        <circle cx="${cx}" cy="${cy}" r="${br}" fill="none"
+                stroke="${infColor}" stroke-width="2" opacity="0"
+                style="${pulseStyle}"/>
+
+        <!-- Infection overlay -->
+        <circle cx="${cx}" cy="${cy}" r="${Math.round(br * 1.35)}"
+                fill="url(#infGrad_${cx})"
+                filter="url(#glow_${cx})"
+                class="bm-inf-circle"/>
+
+        <!-- Region dot marker -->
+        <circle cx="${cx}" cy="${cy}" r="4" fill="${infColor}" opacity="0.9"/>
+      </svg>
+    </div>
+
+    <!-- Stats panel -->
+    <div class="bm-stats">
+
+      <div class="bm-stat-row">
+        <span class="bm-stat-label">Recovery progress</span>
+        <span class="bm-stat-value">${pct}%</span>
+      </div>
+      <div class="bm-progress-track">
+        <div class="bm-progress-fill" style="width:${barW}%;background:${infColor}"></div>
+      </div>
+
+      <div class="bm-stat-row" style="margin-top:14px">
+        <span class="bm-stat-label">Affected area</span>
+        <span class="bm-stat-value">${escapeHtml(label)}</span>
+      </div>
+
+      <div class="bm-stat-row">
+        <span class="bm-stat-label">Infection intensity</span>
+        <span class="bm-stat-value">${Math.round(severity * 100)}%</span>
+      </div>
+
+      <div class="bm-stat-row">
+        <span class="bm-stat-label">Schedule</span>
+        <span class="bm-stat-value">${escapeHtml(daysLabel)}</span>
+      </div>
+
+      <p class="bm-disclaimer">
+        ✦ Visual estimate based on prescription data.<br/>
+        Consult your doctor for actual medical assessment.
+      </p>
+    </div>
+  </div>
+
+  <!-- Animated progress bar at bottom -->
+  <div class="bm-footer-bar">
+    <div class="bm-footer-fill" style="width:${barW}%;background:linear-gradient(90deg,${infColor}88,${infColor})"></div>
+  </div>
+</div>`;
+    }
+
+    async function renderBodyMap(convoId) {
+      try {
+        const res  = await fetch(`/body-map/${convoId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (!data.show_map || !data.body_part) return;
+
+        const region = BODY_REGIONS[data.body_part];
+        if (!region) return;
+
+        /* Inject the card after the last AI message bubble */
+        const lastAiRow = [...messages.querySelectorAll('.msg.ai')].at(-1);
+        if (!lastAiRow) return;
+
+        const mapWrap = document.createElement('div');
+        mapWrap.className = 'body-map-wrap';
+        mapWrap.innerHTML = buildBodySVG(
+          region,
+          data.severity      ?? 0.5,
+          data.condition     || 'Condition',
+          data.treatment_days,
+          data.days_elapsed  || 0,
+        );
+
+        /* Insert after the AI row */
+        lastAiRow.insertAdjacentElement('afterend', mapWrap);
+        messages.scrollTop = messages.scrollHeight;
+
+      } catch (err) {
+        console.error('[Cura] Body map error:', err);
+        /* silently swallow — body map is non-critical */
+      }
     }
 
     /* ── Init ── */

@@ -16,6 +16,7 @@ from functions import (
     build_endpoints,
     call_gemini_for_response,
     call_gemini_for_comparison,   # now defined in functions.py
+    call_gemini_for_body_map,     # Step 5 – body-map data extraction
 )
 
 # ── Flask app ─────────────────────────────────────────────────
@@ -177,6 +178,18 @@ def chat():
 
     # ── 5. Store the completed conversation ───────────────────
     convo.set_response(response_text)
+
+    # Attach body-map metadata so GET /body-map/<id> can serve it later.
+    # We store whatever pipeline produced; show_map=False if pipeline errored.
+    if "error" not in gemini_result:
+        convo._body_map_data = call_gemini_for_body_map(
+            prompt       = message,
+            summary      = gemini_result.get("summary", ""),
+            drug_details = drug_details if 'drug_details' in dir() else {},
+        )
+    else:
+        convo._body_map_data = {"show_map": False}
+
     dictofconvos[convo.id] = convo
 
     # ── 6. Return response + id to the frontend ───────────────
@@ -240,6 +253,26 @@ def compare():
         )
 
     return jsonify({"report": report})
+
+
+# =============================================================
+# BODY MAP  —  GET /body-map/<convo_id>
+# Returns the pre-computed body-map metadata attached to a conversation.
+# Frontend: renderBodyMap() in chat.html calls this after /chat responds.
+# Returns : { show_map, body_part, condition, severity,
+#             treatment_days, days_elapsed }
+# =============================================================
+
+@app.route('/body-map/<convo_id>', methods=['GET'])
+def body_map(convo_id):
+    dictofconvos = _get_user_convos()
+    convo        = dictofconvos.get(convo_id)
+
+    if not convo:
+        return jsonify({"show_map": False, "error": "Conversation not found"}), 404
+
+    data = getattr(convo, '_body_map_data', {"show_map": False})
+    return jsonify(data)
 
 
 # =============================================================
