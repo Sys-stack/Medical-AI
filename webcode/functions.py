@@ -3,6 +3,9 @@ import json
 import re
 import base64
 from urllib.parse import quote
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import requests
 from google import genai
@@ -338,6 +341,16 @@ _RESPONSE_SYSTEM_HUMAN = (
     "Explain medical information in simple, clear language a patient can understand. "
     "Use markdown: ## headings, **bold** key terms, bullet lists. "
     "Keep the reply concise and well-structured. Always remind the user to consult a doctor."
+
+        """Rules:
+            The system should generate a professional wellness report including:
+        •  Individual Profile Summary
+        •  Key Observations from Assessment
+        •  Interpretation of Findings in Simple Language
+        •  Identified Risk Indicators
+        •  Wellness Insights
+        •  Personalized Recommendations
+        •  Preventive Lifestyle Suggestions"""
 )
 
 _RESPONSE_SYSTEM_PET = (
@@ -345,6 +358,16 @@ _RESPONSE_SYSTEM_PET = (
     "Explain animal medication information clearly for a pet owner. "
     "Use markdown: ## headings, **bold** key terms, bullet lists. "
     "Keep the reply concise. Always remind the owner to follow their veterinarian's instructions."
+
+        """Rules:
+            The system should generate a professional wellness report including:
+        •  Individual Profile Summary
+        •  Key Observations from Assessment
+        •  Interpretation of Findings in Simple Language
+        •  Identified Risk Indicators
+        •  Wellness Insights
+        •  Personalized Recommendations
+        •  Preventive Lifestyle Suggestions"""
 )
 
 
@@ -390,6 +413,16 @@ _COMPARISON_SYSTEM = (
     "Analyse the progression: highlight improvements, recurring issues, and concerns. "
     "Use markdown: ## headings, **bold** key terms, bullet lists. "
     "Write clearly for a non-medical reader. Always recommend consulting a healthcare professional."
+
+        """Rules:
+            The system should generate a professional wellness report including:
+        •  Individual Profile Summary
+        •  Key Observations from Assessment
+        •  Interpretation of Findings in Simple Language
+        •  Identified Risk Indicators
+        •  Wellness Insights
+        •  Personalized Recommendations
+        •  Preventive Lifestyle Suggestions"""
 )
 
 
@@ -478,6 +511,47 @@ def call_gemini_for_body_map(prompt: str, summary: str, drug_details: dict) -> d
         pass
 
     return {"show_map": False}
+
+
+# ════════════════════════════════════════════════════════════════════════
+# STEP 6 — GEMINI  (Tracking Dashboard Insights)
+# ════════════════════════════════════════════════════════════════════════
+
+_TRACKING_INSIGHTS_SYSTEM = (
+    "You are Cura, a health tracking analyst. "
+    "You will be given a structured summary of a patient's entire medication and condition history. "
+    "Write 3–5 concise, actionable insight bullets for the patient's dashboard. "
+    "Cover: overall recovery trend, any medication adherence notes, upcoming milestones, and one wellness tip. "
+    "Use markdown: **bold** key terms, bullet list only. "
+    "Keep it motivational and easy to read. Always recommend consulting a healthcare professional for medical decisions."
+        """Rules:
+            The system should generate a professional wellness report including:
+        •  Individual Profile Summary
+        •  Key Observations from Assessment
+        •  Interpretation of Findings in Simple Language
+        •  Identified Risk Indicators
+        •  Wellness Insights
+        •  Personalized Recommendations
+        •  Preventive Lifestyle Suggestions"""
+)
+
+
+def call_gemini_for_tracking_insights(tracking_summary: str) -> str:
+    """
+    Step 6 — Generate dashboard insight bullets from the patient's full tracking history.
+    tracking_summary: plain-text summary built by the /tracking-data route.
+    Returns HTML string (via markdown_to_html).
+    """
+    user_turn = (
+        "Here is the patient's current medication and condition tracking summary:\n\n"
+        f"{tracking_summary}\n\n"
+        "Please generate 3–5 actionable insight bullets for their health dashboard."
+    )
+    try:
+        raw = _generate_with_fallback(user_turn, temperature=0.45, system_instruction=_TRACKING_INSIGHTS_SYSTEM)
+        return markdown_to_html(raw or "No insights available at this time.")
+    except Exception as exc:
+        return f"<p>Could not generate insights: {exc}</p>"
 
 
 # ════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<!--
+  templates/tracking.html — Cura Health Tracking Dashboard
+  Flask routes used:
+    GET /tracking-data     — all session conversations + body-map metadata
+    GET /tracking-insights — AI-generated insight bullets (on demand)
+    GET /body-map/<id>     — individual body-map detail (same as chat page)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cura — Health Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='static.css') }}" />
+</head>
+
+<body class="chat-page-body trk-body">
+
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+
+  <!-- NAVBAR -->
+  <header class="navbar" id="navbar">
+    <div class="container">
+      <a href="/" class="nav-logo">Cura<span class="accent-dot">.</span></a>
+      <nav>
+        <ul class="nav-links" id="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/chatAI">Chat</a></li>
+          <li><a href="/tracking" class="nav-active">Track Progress</a></li>
+        </ul>
+      </nav>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode">🌙</button>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- PAGE BODY -->
+  <div class="trk-page" id="trk-page">
+
+    <!-- ── PAGE HEADER ─────────────────────────────────── -->
+    <div class="trk-hero">
+      <p class="trk-hero-eyebrow">Your health, visualised</p>
+      <h1 class="trk-hero-title">Health <em>Tracker</em></h1>
+      <p class="trk-hero-sub">Body map, medication schedule, and AI insights — all in one place.</p>
+    </div>
+
+    <!-- ── MAIN GRID ────────────────────────────────────── -->
+    <div class="trk-grid" id="trk-grid">
+
+      <!-- ══════════════════════════════════════════════════
+           LEFT COLUMN
+      ══════════════════════════════════════════════════ -->
+      <div class="trk-col-left">
+
+        <!-- FULL BODY MAP PANEL -->
+        <section class="trk-card trk-bodymap-card" id="trk-bodymap-panel" aria-label="Body map">
+          <div class="trk-card-header">
+            <span class="trk-card-icon">🫀</span>
+            <div>
+              <p class="trk-card-eyebrow">Internal Progress Map</p>
+              <p class="trk-card-title">Body Condition Overview</p>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="trk-bm-legend">
+            <span class="trk-legend-dot" style="background:#dc3232"></span><span>Severe</span>
+            <span class="trk-legend-dot" style="background:#e29632"></span><span>Moderate</span>
+            <span class="trk-legend-dot" style="background:#64be50"></span><span>Mild</span>
+            <span class="trk-legend-dot" style="background:#3cc878"></span><span>Healed</span>
+          </div>
+
+          <!-- SVG Figure — full interactive body -->
+          <div class="trk-figure-wrap" id="trk-figure-wrap">
+            <svg id="trk-body-svg" class="trk-body-svg" viewBox="0 0 400 490"
+                 xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Body map">
+              <defs>
+                <style>
+                  .trk-region { cursor: pointer; transition: opacity 0.2s; }
+                  .trk-region:hover { opacity: 0.75; }
+                  @keyframes trk-pulse {
+                    0%   { r: 0px;   opacity: 0.8; }
+                    70%  { opacity: 0; }
+                    100% { r: 32px; opacity: 0;   }
+                  }
+                  .trk-pulse-ring { animation: trk-pulse 2.2s ease-out infinite; }
+                </style>
+              </defs>
+
+              <!-- ── BODY SILHOUETTE ── -->
+              <!-- Head -->
+              <ellipse cx="200" cy="55" rx="30" ry="34"
+                       fill="var(--glass-bg-light)" stroke="var(--glass-border)" stroke-width="1.5"/>
+              <!-- Neck -->
+              <rect x="190" y="85" width="20" height="22" rx="5"
+                    fill="var(--glass-bg-light)" stroke="var(--glass-border)" stroke-width="1.5"/>
+              <!-- Torso -->
+              <path d="M150 108 Q142 145 138 285 Q162 300 200 300 Q238 300 262 285 Q258 145 250 108 Z"
+                    fill="var(--glass-bg-light)" stroke="var(--glass-border)" stroke-width="1.5"/>
+              <!-- Left arm -->
+              <path d="M150 118 Q124 158 114 232 Q111 252 120 268"
+                    fill="none" stroke="var(--glass-border)" stroke-width="10"
+                    stroke-linecap="round" opacity="0.35"/>
+              <path d="M150 118 Q124 158 114 232 Q111 252 120 268"
+                    fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+              <!-- Right arm -->
+              <path d="M250 118 Q276 158 286 232 Q289 252 280 268"
+                    fill="none" stroke="var(--glass-border)" stroke-width="10"
+                    stroke-linecap="round" opacity="0.35"/>
+              <path d="M250 118 Q276 158 286 232 Q289 252 280 268"
+                    fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+              <!-- Left leg -->
+              <path d="M175 298 Q168 345 166 398 Q164 432 174 464"
+                    fill="none" stroke="var(--glass-border)" stroke-width="12"
+                    stroke-linecap="round" opacity="0.35"/>
+              <path d="M175 298 Q168 345 166 398 Q164 432 174 464"
+                    fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+              <!-- Right leg -->
+              <path d="M225 298 Q232 345 234 398 Q236 432 226 464"
+                    fill="none" stroke="var(--glass-border)" stroke-width="12"
+                    stroke-linecap="round" opacity="0.35"/>
+              <path d="M225 298 Q232 345 234 398 Q236 432 226 464"
+                    fill="none" stroke="var(--glass-border)" stroke-width="1.5" stroke-linecap="round"/>
+
+              <!-- ── CLICKABLE REGION OVERLAYS (filled by JS) ── -->
+              <g id="trk-regions"></g>
+
+              <!-- ── DETAIL TOOLTIP ── -->
+              <g id="trk-tooltip" display="none">
+                <rect id="trk-tt-bg" rx="6" fill="var(--bg-secondary)" stroke="var(--glass-border)"
+                      stroke-width="1" opacity="0.96"/>
+                <text id="trk-tt-title" font-size="10" font-family="DM Sans, sans-serif"
+                      fill="var(--text-light)" font-weight="500"/>
+                <text id="trk-tt-sub"   font-size="9"  font-family="DM Sans, sans-serif"
+                      fill="var(--accent)" font-weight="400"/>
+              </g>
+            </svg>
+
+            <!-- Empty state shown before data loads -->
+            <div class="trk-empty-figure" id="trk-empty-figure">
+              <p>No body-map data yet.</p>
+              <a href="/chatAI" class="trk-link">Start a chat →</a>
+            </div>
+          </div>
+
+          <!-- Selected region detail card -->
+          <div class="trk-region-detail" id="trk-region-detail" hidden>
+            <div class="trk-rd-top">
+              <span class="trk-rd-label" id="trk-rd-label">–</span>
+              <span class="trk-rd-badge" id="trk-rd-badge">–</span>
+            </div>
+            <div class="trk-rd-bar-wrap">
+              <div class="trk-rd-bar-track">
+                <div class="trk-rd-bar-fill" id="trk-rd-bar"></div>
+              </div>
+              <span class="trk-rd-pct" id="trk-rd-pct">0%</span>
+            </div>
+            <div class="trk-rd-meta">
+              <span id="trk-rd-days">–</span>
+              <span id="trk-rd-date">–</span>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /col-left -->
+
+      <!-- ══════════════════════════════════════════════════
+           RIGHT COLUMN
+      ══════════════════════════════════════════════════ -->
+      <div class="trk-col-right">
+
+        <!-- AI INSIGHTS PANEL -->
+        <section class="trk-card trk-insights-card" id="trk-insights-card" aria-label="AI Insights">
+          <div class="trk-card-header">
+            <span class="trk-card-icon" style="animation:breathe 2.4s ease-in-out infinite">✦</span>
+            <div>
+              <p class="trk-card-eyebrow">Powered by AI</p>
+              <p class="trk-card-title">Health Insights</p>
+            </div>
+            <button class="trk-refresh-btn" id="trk-insights-btn" title="Refresh insights">
+              <span id="trk-insights-btn-icon">↻</span> Refresh
+            </button>
+          </div>
+          <div class="trk-insights-body" id="trk-insights-body">
+            <div class="trk-insights-placeholder">
+              <p>Click <strong>Refresh</strong> to generate AI insights from your health history.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- MEDICATION TRACKER -->
+        <section class="trk-card trk-meds-card" aria-label="Medication tracker">
+          <div class="trk-card-header">
+            <span class="trk-card-icon">💊</span>
+            <div>
+              <p class="trk-card-eyebrow">Medication Schedule</p>
+              <p class="trk-card-title">Active Treatments</p>
+            </div>
+          </div>
+          <div id="trk-meds-list" class="trk-meds-list">
+            <div class="trk-meds-placeholder" id="trk-meds-placeholder">
+              <p>No active medications tracked.</p>
+              <a href="/chatAI" class="trk-link">Describe a prescription →</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- HEALTH TIMELINE -->
+        <section class="trk-card trk-timeline-card" aria-label="Health timeline">
+          <div class="trk-card-header">
+            <span class="trk-card-icon">📈</span>
+            <div>
+              <p class="trk-card-eyebrow">Severity Over Time</p>
+              <p class="trk-card-title">Health Timeline</p>
+            </div>
+          </div>
+
+          <!-- SVG chart -->
+          <div class="trk-chart-wrap">
+            <svg id="trk-chart" class="trk-chart-svg" viewBox="0 0 520 160"
+                 xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+              <!-- Rendered by JS -->
+              <text x="260" y="88" text-anchor="middle" font-size="11"
+                    font-family="DM Sans,sans-serif" fill="rgba(231,232,239,0.2)"
+                    id="trk-chart-placeholder">Start a chat to see your timeline</text>
+            </svg>
+          </div>
+
+          <!-- Timeline entry list -->
+          <ul class="trk-timeline-list" id="trk-timeline-list" role="list"></ul>
+        </section>
+
+      </div><!-- /col-right -->
+
+    </div><!-- /trk-grid -->
+  </div><!-- /trk-page -->
+
+  <div class="chat-page-hint">
+    Cura is an AI assistant · Responses are not medical advice · &copy; <span id="year"></span> Cura
+  </div>
+
+  <script>
+    /* ══════════════════════════════════════════════════════════
+       UTILITIES
+    ══════════════════════════════════════════════════════════ */
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Theme ── */
+    const themeToggle = document.getElementById('theme-toggle');
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      themeToggle.textContent = t === 'light' ? '🌙' : '☀️';
+      localStorage.setItem('cura_theme', t);
+    }
+    applyTheme(localStorage.getItem('cura_theme') || 'dark');
+    themeToggle.addEventListener('click', () => {
+      applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+
+    /* ── Mobile nav ── */
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks  = document.getElementById('nav-links');
+    navToggle.addEventListener('click', () => {
+      const open = navLinks.classList.toggle('open');
+      navToggle.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+    });
+
+    /* ── Navbar scroll ── */
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    /* ══════════════════════════════════════════════════════════
+       BODY REGIONS MAP  (same data as chat.html)
+    ══════════════════════════════════════════════════════════ */
+    const BODY_REGIONS = {
+      head:           { cx:200, cy:55,  r:22, label:'Head'           },
+      neck:           { cx:200, cy:98,  r:12, label:'Neck'           },
+      throat:         { cx:200, cy:98,  r:12, label:'Throat'         },
+      nose:           { cx:200, cy:65,  r: 9, label:'Nose'           },
+      left_ear:       { cx:171, cy:58,  r: 9, label:'Left Ear'       },
+      right_ear:      { cx:229, cy:58,  r: 9, label:'Right Ear'      },
+      eye_left:       { cx:188, cy:50,  r: 7, label:'Left Eye'       },
+      eye_right:      { cx:212, cy:50,  r: 7, label:'Right Eye'      },
+      left_lung:      { cx:175, cy:160, r:24, label:'Left Lung'      },
+      right_lung:     { cx:225, cy:160, r:24, label:'Right Lung'     },
+      heart:          { cx:192, cy:155, r:16, label:'Heart'          },
+      stomach:        { cx:200, cy:208, r:20, label:'Stomach'        },
+      liver:          { cx:220, cy:198, r:18, label:'Liver'          },
+      intestines:     { cx:200, cy:248, r:26, label:'Intestines'     },
+      bladder:        { cx:200, cy:280, r:14, label:'Bladder'        },
+      left_kidney:    { cx:178, cy:218, r:13, label:'Left Kidney'    },
+      right_kidney:   { cx:222, cy:218, r:13, label:'Right Kidney'   },
+      spine:          { cx:200, cy:215, r: 9, label:'Spine'          },
+      left_shoulder:  { cx:150, cy:128, r:16, label:'Left Shoulder'  },
+      right_shoulder: { cx:250, cy:128, r:16, label:'Right Shoulder' },
+      left_elbow:     { cx:130, cy:193, r:13, label:'Left Elbow'     },
+      right_elbow:    { cx:270, cy:193, r:13, label:'Right Elbow'    },
+      left_hand:      { cx:118, cy:255, r:13, label:'Left Hand'      },
+      right_hand:     { cx:282, cy:255, r:13, label:'Right Hand'     },
+      left_knee:      { cx:175, cy:368, r:15, label:'Left Knee'      },
+      right_knee:     { cx:225, cy:368, r:15, label:'Right Knee'     },
+      left_foot:      { cx:172, cy:456, r:13, label:'Left Foot'      },
+      right_foot:     { cx:228, cy:456, r:13, label:'Right Foot'     },
+      skin:           { cx:200, cy:200, r:40, label:'Skin'           },
+    };
+
+    function sevColor(sev) {
+      const r = Math.round(220*sev + 60*(1-sev));
+      const g = Math.round(40 *sev + 180*(1-sev));
+      const b = Math.round(40 *sev + 60*(1-sev));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function sevLabel(sev) {
+      if (sev <= 0.05) return 'Healed';
+      if (sev <= 0.30) return 'Mild';
+      if (sev <= 0.60) return 'Moderate';
+      return 'Severe';
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DATA LOAD
+    ══════════════════════════════════════════════════════════ */
+    let _allEntries = [];
+
+    async function loadTrackingData() {
+      try {
+        const res  = await fetch('/tracking-data');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        _allEntries = data.entries || [];
+        renderAll(_allEntries);
+      } catch (err) {
+        console.error('[Cura Tracker] load error:', err);
+      }
+    }
+
+    function renderAll(entries) {
+      renderBodyMap(entries);
+      renderMeds(entries);
+      renderTimeline(entries);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       BODY MAP — full interactive SVG
+    ══════════════════════════════════════════════════════════ */
+    function renderBodyMap(entries) {
+      const svg          = document.getElementById('trk-body-svg');
+      const regionsGroup = document.getElementById('trk-regions');
+      const emptyFig     = document.getElementById('trk-empty-figure');
+
+      // Keep only entries that have body-map data
+      const mapped = entries.filter(e => e.show_map && e.body_part && BODY_REGIONS[e.body_part]);
+
+      if (mapped.length === 0) {
+        emptyFig.style.display = 'flex';
+        return;
+      }
+      emptyFig.style.display = 'none';
+
+      // Build a deduplicated map: body_part → worst (highest severity) entry
+      const regionMap = {};
+      for (const e of mapped) {
+        const key = e.body_part;
+        if (!regionMap[key] || e.severity > regionMap[key].severity) {
+          regionMap[key] = e;
+        }
+      }
+
+      // Clear old overlays
+      regionsGroup.innerHTML = '';
+
+      // Inject unique SVG defs per region
+      let defsEl = svg.querySelector('defs');
+      // Remove old dynamic defs
+      svg.querySelectorAll('defs .trk-dyn').forEach(n => n.remove());
+
+      for (const [part, entry] of Object.entries(regionMap)) {
+        const reg   = BODY_REGIONS[part];
+        const sev   = entry.severity;
+        const color = sevColor(sev);
+        const uid   = `trk_${part}`;
+
+        // Gradient
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+        grad.setAttribute('id', `${uid}_g`);
+        grad.setAttribute('cx','50%'); grad.setAttribute('cy','50%'); grad.setAttribute('r','50%');
+        grad.classList.add('trk-dyn');
+        const s0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s0.setAttribute('offset','0%');
+        s0.setAttribute('stop-color', color);
+        s0.setAttribute('stop-opacity', String((sev*0.85+0.1).toFixed(2)));
+        const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        s1.setAttribute('offset','100%');
+        s1.setAttribute('stop-color', color);
+        s1.setAttribute('stop-opacity','0');
+        grad.append(s0, s1);
+        defsEl.appendChild(grad);
+
+        // Group
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.classList.add('trk-region');
+        g.setAttribute('data-part', part);
+        g.setAttribute('role', 'button');
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('aria-label', `${reg.label}: ${sevLabel(sev)}`);
+
+        // Pulse ring (only when not healed)
+        if (sev > 0.05) {
+          const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          pulse.setAttribute('cx', reg.cx); pulse.setAttribute('cy', reg.cy); pulse.setAttribute('r', '0');
+          pulse.setAttribute('fill','none');
+          pulse.setAttribute('stroke', color); pulse.setAttribute('stroke-width','1.5');
+          pulse.classList.add('trk-pulse-ring');
+          g.appendChild(pulse);
+        }
+
+        // Infection overlay circle
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', reg.cx); circle.setAttribute('cy', reg.cy);
+        circle.setAttribute('r', Math.round(reg.r * 1.4));
+        circle.setAttribute('fill', `url(#${uid}_g)`);
+        g.appendChild(circle);
+
+        // Centre dot
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', reg.cx); dot.setAttribute('cy', reg.cy); dot.setAttribute('r','4');
+        dot.setAttribute('fill', color); dot.setAttribute('opacity','0.9');
+        g.appendChild(dot);
+
+        // Click / keyboard → show detail card
+        const showDetail = () => selectRegion(part, entry, reg, color);
+        g.addEventListener('click', showDetail);
+        g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') showDetail(); });
+
+        regionsGroup.appendChild(g);
+      }
+
+      // Auto-select the most severe region
+      const topEntry = Object.entries(regionMap).sort((a,b)=>b[1].severity-a[1].severity)[0];
+      if (topEntry) selectRegion(topEntry[0], topEntry[1], BODY_REGIONS[topEntry[0]], sevColor(topEntry[1].severity));
+    }
+
+    function selectRegion(part, entry, reg, color) {
+      const detail = document.getElementById('trk-region-detail');
+      const label  = document.getElementById('trk-rd-label');
+      const badge  = document.getElementById('trk-rd-badge');
+      const bar    = document.getElementById('trk-rd-bar');
+      const pct    = document.getElementById('trk-rd-pct');
+      const days   = document.getElementById('trk-rd-days');
+      const date   = document.getElementById('trk-rd-date');
+
+      const recovery = Math.round((1 - entry.severity) * 100);
+      const daysLeft = entry.treatment_days != null
+                         ? Math.max(0, entry.treatment_days - entry.days_elapsed)
+                         : null;
+
+      label.textContent = `${entry.condition} · ${reg.label}`;
+      badge.textContent = sevLabel(entry.severity);
+      badge.style.color = color;
+      badge.style.borderColor = color;
+      bar.style.width      = `${recovery}%`;
+      bar.style.background = color;
+      pct.textContent      = `${recovery}% recovered`;
+      days.textContent     = daysLeft != null ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining` : 'Duration unknown';
+      date.textContent     = `Last updated: ${entry.date} ${entry.time}`;
+
+      detail.hidden = false;
+
+      // Highlight selected region
+      document.querySelectorAll('.trk-region').forEach(g => g.style.opacity = '0.45');
+      const sel = document.querySelector(`.trk-region[data-part="${part}"]`);
+      if (sel) sel.style.opacity = '1';
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       MEDICATION TRACKER
+    ══════════════════════════════════════════════════════════ */
+    function getMedKey(entry) { return `cura_med_taken_${entry.id}`; }
+
+    function renderMeds(entries) {
+      const list        = document.getElementById('trk-meds-list');
+      const placeholder = document.getElementById('trk-meds-placeholder');
+
+      // Only entries that have tracked treatment data
+      const active = entries.filter(e => e.show_map && e.treatment_days);
+
+      if (active.length === 0) {
+        placeholder.style.display = 'block';
+        return;
+      }
+      placeholder.style.display = 'none';
+
+      // Clear old items (keep placeholder)
+      list.querySelectorAll('.trk-med-item').forEach(el => el.remove());
+
+      active.forEach(entry => {
+        const daysLeft = Math.max(0, entry.treatment_days - entry.days_elapsed);
+        const pct      = Math.min(100, Math.round((entry.days_elapsed / entry.treatment_days) * 100));
+        const color    = sevColor(entry.severity);
+        const takenKey = getMedKey(entry);
+        const taken    = localStorage.getItem(takenKey) === '1';
+        const status   = daysLeft === 0 ? 'complete' : taken ? 'taken-today' : 'pending';
+
+        const item = document.createElement('div');
+        item.className = `trk-med-item trk-med-${status}`;
+        item.dataset.id = entry.id;
+
+        item.innerHTML = `
+          <div class="trk-med-top">
+            <div class="trk-med-info">
+              <span class="trk-med-name">${escapeHtml(entry.condition)}</span>
+              <span class="trk-med-region">${escapeHtml(entry.body_part ? (BODY_REGIONS[entry.body_part]?.label || entry.body_part) : '–')}</span>
+            </div>
+            <button class="trk-med-btn trk-med-btn--${status}" data-id="${entry.id}" title="${status === 'taken-today' ? 'Mark as not taken' : 'Mark as taken today'}">
+              ${status === 'complete' ? '✓ Done' : status === 'taken-today' ? '✓ Taken' : 'Mark taken'}
+            </button>
+          </div>
+          <div class="trk-med-bar-wrap">
+            <div class="trk-med-bar-track">
+              <div class="trk-med-bar-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+            <span class="trk-med-pct">${pct}%</span>
+          </div>
+          <div class="trk-med-meta">
+            <span>${entry.days_elapsed} / ${entry.treatment_days} days completed</span>
+            <span>${daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left` : 'Treatment complete'}</span>
+          </div>
+          <div class="trk-med-date">${entry.date}</div>`;
+
+        list.appendChild(item);
+      });
+
+      // Toggle taken state
+      list.querySelectorAll('.trk-med-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id  = btn.dataset.id;
+          const entry = active.find(e => e.id === id);
+          if (!entry) return;
+          const key = getMedKey(entry);
+          const cur = localStorage.getItem(key) === '1';
+          localStorage.setItem(key, cur ? '0' : '1');
+          renderMeds(_allEntries); // re-render
+        });
+      });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       HEALTH TIMELINE  (SVG sparkline + entry list)
+    ══════════════════════════════════════════════════════════ */
+    function renderTimeline(entries) {
+      const chartSvg    = document.getElementById('trk-chart');
+      const placeholder = document.getElementById('trk-chart-placeholder');
+      const listEl      = document.getElementById('trk-timeline-list');
+
+      const mapped = [...entries].filter(e => e.show_map).reverse(); // oldest first
+
+      listEl.innerHTML = '';
+
+      if (mapped.length === 0) {
+        placeholder.style.display = '';
+        return;
+      }
+      placeholder.style.display = 'none';
+
+      // ── SVG Sparkline ──────────────────────────────────────
+      const W = 520, H = 160, PAD = 28;
+      const xs = mapped.map((_, i) => PAD + (i / Math.max(mapped.length - 1, 1)) * (W - PAD * 2));
+      const ys = mapped.map(e    => PAD + (1 - e.severity) * (H - PAD * 2));
+
+      // Remove old dynamic content
+      chartSvg.querySelectorAll('.trk-chart-dyn').forEach(n => n.remove());
+
+      // Grid lines
+      [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+        const y = PAD + (1 - v) * (H - PAD * 2);
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1', PAD); line.setAttribute('x2', W - PAD);
+        line.setAttribute('y1', y);   line.setAttribute('y2', y);
+        line.setAttribute('stroke','rgba(231,232,239,0.06)'); line.setAttribute('stroke-width','1');
+        line.classList.add('trk-chart-dyn');
+        chartSvg.appendChild(line);
+
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+        lbl.setAttribute('x', PAD - 4); lbl.setAttribute('y', y + 3.5);
+        lbl.setAttribute('text-anchor','end'); lbl.setAttribute('font-size','8');
+        lbl.setAttribute('font-family','DM Sans,sans-serif');
+        lbl.setAttribute('fill','rgba(231,232,239,0.25)');
+        lbl.textContent = `${Math.round(v*100)}%`;
+        lbl.classList.add('trk-chart-dyn');
+        chartSvg.appendChild(lbl);
+      });
+
+      if (mapped.length >= 2) {
+        // Filled area under line
+        const areaPoints = xs.map((x,i) => `${x},${ys[i]}`).join(' ');
+        const area = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        area.setAttribute('points',
+          `${xs[0]},${H-PAD} ${areaPoints} ${xs[xs.length-1]},${H-PAD}`);
+        area.setAttribute('fill','rgba(226,191,121,0.07)');
+        area.setAttribute('stroke','none');
+        area.classList.add('trk-chart-dyn');
+        chartSvg.appendChild(area);
+
+        // Line
+        const polyline = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        polyline.setAttribute('points', xs.map((x,i)=>`${x},${ys[i]}`).join(' '));
+        polyline.setAttribute('fill','none');
+        polyline.setAttribute('stroke','var(--accent)');
+        polyline.setAttribute('stroke-width','1.8');
+        polyline.setAttribute('stroke-linejoin','round');
+        polyline.classList.add('trk-chart-dyn');
+        chartSvg.appendChild(polyline);
+      }
+
+      // Dots
+      mapped.forEach((entry, i) => {
+        const color = sevColor(entry.severity);
+        const dot   = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('cx', xs[i]); dot.setAttribute('cy', ys[i]); dot.setAttribute('r','5');
+        dot.setAttribute('fill', color); dot.setAttribute('stroke','var(--bg-primary)');
+        dot.setAttribute('stroke-width','1.5');
+        dot.classList.add('trk-chart-dyn');
+        dot.style.cursor = 'pointer';
+
+        // Tooltip on hover
+        dot.addEventListener('mouseenter', () => showChartTooltip(dot, entry, xs[i], ys[i]));
+        dot.addEventListener('mouseleave', hideChartTooltip);
+
+        chartSvg.appendChild(dot);
+      });
+
+      // ── Entry List ─────────────────────────────────────────
+      [...mapped].reverse().forEach(entry => {
+        const color = sevColor(entry.severity);
+        const pct   = Math.round((1 - entry.severity) * 100);
+        const li    = document.createElement('li');
+        li.className = 'trk-tl-item';
+        li.innerHTML = `
+          <span class="trk-tl-dot" style="background:${color};box-shadow:0 0 6px ${color}66"></span>
+          <div class="trk-tl-content">
+            <span class="trk-tl-cond">${escapeHtml(entry.condition)}</span>
+            <span class="trk-tl-region">${escapeHtml(entry.body_part ? (BODY_REGIONS[entry.body_part]?.label || '') : '')}</span>
+          </div>
+          <div class="trk-tl-right">
+            <span class="trk-tl-sev" style="color:${color}">${sevLabel(entry.severity)}</span>
+            <span class="trk-tl-date">${entry.date}</span>
+          </div>`;
+        listEl.appendChild(li);
+      });
+    }
+
+    // Chart tooltip helpers
+    let _chartTT = null;
+    function showChartTooltip(dotEl, entry, x, y) {
+      hideChartTooltip();
+      const svg = document.getElementById('trk-chart');
+      const tt  = document.createElementNS('http://www.w3.org/2000/svg','g');
+      tt.classList.add('trk-chart-dyn');
+      const W   = 520;
+      const ttW = 115, ttH = 36;
+      const tx  = Math.min(x - ttW/2, W - ttW - 4);
+      const ty  = Math.max(y - ttH - 10, 4);
+      const bg  = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      bg.setAttribute('x',tx); bg.setAttribute('y',ty);
+      bg.setAttribute('width',ttW); bg.setAttribute('height',ttH);
+      bg.setAttribute('rx','5'); bg.setAttribute('fill','var(--bg-secondary)');
+      bg.setAttribute('stroke','var(--glass-border)'); bg.setAttribute('stroke-width','1');
+      const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t1.setAttribute('x',tx+7); t1.setAttribute('y',ty+13);
+      t1.setAttribute('font-size','9'); t1.setAttribute('font-family','DM Sans,sans-serif');
+      t1.setAttribute('fill','var(--text-light)'); t1.setAttribute('font-weight','500');
+      t1.textContent = entry.condition.slice(0,16);
+      const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t2.setAttribute('x',tx+7); t2.setAttribute('y',ty+26);
+      t2.setAttribute('font-size','8.5'); t2.setAttribute('font-family','DM Sans,sans-serif');
+      t2.setAttribute('fill','var(--accent)');
+      t2.textContent = `${sevLabel(entry.severity)} · ${entry.date}`;
+      tt.append(bg, t1, t2);
+      svg.appendChild(tt);
+      _chartTT = tt;
+    }
+    function hideChartTooltip() {
+      if (_chartTT) { _chartTT.remove(); _chartTT = null; }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       AI INSIGHTS
+    ══════════════════════════════════════════════════════════ */
+    const insightsBtn  = document.getElementById('trk-insights-btn');
+    const insightsBody = document.getElementById('trk-insights-body');
+
+    insightsBtn.addEventListener('click', loadInsights);
+
+    async function loadInsights() {
+      insightsBtn.disabled = true;
+      document.getElementById('trk-insights-btn-icon').textContent = '…';
+      insightsBody.innerHTML = `<div class="typing" style="padding:8px 0"><span></span><span></span><span></span></div>`;
+      try {
+        const res  = await fetch('/tracking-insights');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        insightsBody.innerHTML = data.insights;
+      } catch (err) {
+        insightsBody.innerHTML = '<p class="md-p">Could not load insights. Please try again.</p>';
+        console.error('[Cura Tracker] insights error:', err);
+      } finally {
+        insightsBtn.disabled = false;
+        document.getElementById('trk-insights-btn-icon').textContent = '↻';
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       INIT
+    ══════════════════════════════════════════════════════════ */
+    loadTrackingData();
+  </script>
+
+</body>
+</html>

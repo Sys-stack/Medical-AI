@@ -35,6 +35,7 @@
         <ul class="nav-links" id="nav-links">
           <li><a href="/">Home</a></li>
           <li><a href="/chatAI">Chat</a></li>
+          <li><a href="/tracking">Track Progress</a></li>
         </ul>
       </nav>
 
@@ -143,6 +144,7 @@
           <span class="chat-done-icon">✦</span>
           <p class="chat-done-text">Response complete</p>
           <a href="/chatAI" class="chat-done-link">Ask another question →</a>
+          <a href="/tracking" class="chat-done-link chat-done-track">View body map →</a>
         </div>
 
       </div>
@@ -467,7 +469,7 @@
 
         /* ── Body Map: fetch and render if applicable ── */
         if (data.convo_id) {
-          renderBodyMap(data.convo_id);
+          await renderBodyMap(data.convo_id);
         }
 
       } catch (err) {

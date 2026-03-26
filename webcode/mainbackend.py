@@ -15,8 +15,9 @@ from functions import (
     call_gemini,
     build_endpoints,
     call_gemini_for_response,
-    call_gemini_for_comparison,   # now defined in functions.py
-    call_gemini_for_body_map,     # Step 5 – body-map data extraction
+    call_gemini_for_comparison,        # Step 4 – health-progress comparison
+    call_gemini_for_body_map,          # Step 5 – body-map data extraction
+    call_gemini_for_tracking_insights, # Step 6 – tracking dashboard insights
 )
 
 # ── Flask app ─────────────────────────────────────────────────
@@ -122,7 +123,7 @@ def chat():
     # ── 4. PIPELINE ───────────────────────────────────────────
     #
     # Step A — Gemini reads the prescription / medical text + optional image.
-    #          Returns: { summary, drugs: ["drug1", ...] }
+    #          Returns: { summary, drugs: ["drug1", ...], patient_type }
     #
     # Step B — For each drug, build API endpoints and fetch data from
     #          OpenFDA + NLM via data_fetch().
@@ -130,6 +131,14 @@ def chat():
     # Step C — Second Gemini call: convert all findings into plain-language
     #          layman's terms for the patient.
     # ──────────────────────────────────────────────────────────
+
+    # Initialise all pipeline variables before try so they are always defined
+    gemini_result = {"show_map": False}
+    drug_details  = {}
+    summary       = ""
+    patient_type  = "human"
+    response_text = ""
+
     # Convert image → base64
     image_b64 = None
     if image_path:
@@ -137,7 +146,7 @@ def chat():
             image_b64 = base64.b64encode(f.read()).decode("utf-8")
 
     try:
-        # Step A: extract summary + drug list
+        # Step A: extract summary + drug list + patient_type
         gemini_result = call_gemini(
             text=message or "",
             image_b64=image_b64
@@ -145,19 +154,19 @@ def chat():
 
         if "error" in gemini_result:
             error_msg = gemini_result.get("error", "Unknown error")
-
             response_text = (
                 "I had trouble reading that prescription.\n"
                 f"Error details: {error_msg}"
             )
         else:
-            summary   = gemini_result.get("summary", "")
-            drug_list = gemini_result.get("drugs", [])
+            summary      = gemini_result.get("summary", "")
+            drug_list    = gemini_result.get("drugs", [])
+            patient_type = gemini_result.get("patient_type", "human")
 
             # Step B
-            drug_details: dict = {}
+            drug_details = {}
             for drug in drug_list:
-                endpoints          = build_endpoints(drug)
+                endpoints          = build_endpoints(drug, patient_type)
                 drug_details[drug] = data_fetch(endpoints)
 
             # Step C
@@ -165,6 +174,7 @@ def chat():
                 user_message = message,
                 summary      = summary,
                 drug_details = drug_details,
+                patient_type = patient_type,
             )
 
     except Exception as exc:
@@ -184,8 +194,8 @@ def chat():
     if "error" not in gemini_result:
         convo._body_map_data = call_gemini_for_body_map(
             prompt       = message,
-            summary      = gemini_result.get("summary", ""),
-            drug_details = drug_details if 'drug_details' in dir() else {},
+            summary      = summary,
+            drug_details = drug_details,
         )
     else:
         convo._body_map_data = {"show_map": False}
@@ -255,6 +265,11 @@ def compare():
     return jsonify({"report": report})
 
 
+@app.route('/tracking', methods=['GET'])
+def tracking():
+    return render_template("tracking.html")
+
+
 # =============================================================
 # BODY MAP  —  GET /body-map/<convo_id>
 # Returns the pre-computed body-map metadata attached to a conversation.
@@ -273,6 +288,87 @@ def body_map(convo_id):
 
     data = getattr(convo, '_body_map_data', {"show_map": False})
     return jsonify(data)
+
+
+# =============================================================
+# TRACKING DATA  —  GET /tracking-data
+# Returns all session conversations enriched with body-map data,
+# sorted newest-first. Powers the tracking dashboard.
+# Returns : { "entries": [ { id, date, title, prompt, response,
+#              body_part, condition, severity, treatment_days,
+#              days_elapsed, show_map, drugs }, ... ] }
+# =============================================================
+
+@app.route('/tracking-data', methods=['GET'])
+def tracking_data():
+    dictofconvos = _get_user_convos()
+    entries      = []
+
+    for convo in sorted(dictofconvos.values(), key=lambda c: c.time, reverse=True):
+        bm   = getattr(convo, '_body_map_data', {})
+        # Extract drug names from prompt via lightweight heuristic
+        # (they were already stored in the body-map call context)
+        entry = {
+            "id":             convo.id,
+            "date":           convo.time.strftime("%d %b %Y"),
+            "time":           convo.time.strftime("%H:%M"),
+            "title":          convo.title,
+            "prompt":         convo.prompt,
+            "show_map":       bm.get("show_map", False),
+            "body_part":      bm.get("body_part"),
+            "condition":      bm.get("condition", "General query"),
+            "severity":       bm.get("severity", 0),
+            "treatment_days": bm.get("treatment_days"),
+            "days_elapsed":   bm.get("days_elapsed", 0),
+        }
+        entries.append(entry)
+
+    return jsonify({"entries": entries})
+
+
+# =============================================================
+# TRACKING INSIGHTS  —  GET /tracking-insights
+# Asks Gemini to generate 3–5 insight bullets from the patient's
+# full body-map history. Expensive — only call on user demand.
+# Returns : { "insights": "<HTML bullet list>" }
+# =============================================================
+
+@app.route('/tracking-insights', methods=['GET'])
+def tracking_insights():
+    dictofconvos = _get_user_convos()
+
+    if not dictofconvos:
+        return jsonify({"insights": "<p class='md-p'>No health data recorded yet. Start a conversation in the Chat to see insights here.</p>"})
+
+    # Build a plain-text summary of all tracked conditions
+    lines = []
+    for convo in sorted(dictofconvos.values(), key=lambda c: c.time):
+        bm = getattr(convo, '_body_map_data', {})
+        if not bm.get("show_map"):
+            continue
+        td  = bm.get("treatment_days")
+        de  = bm.get("days_elapsed", 0)
+        sev = bm.get("severity", 0)
+        lines.append(
+            f"[{convo.time.strftime('%d %b %Y')}] "
+            f"Condition: {bm.get('condition','?')} | "
+            f"Area: {bm.get('body_part','?')} | "
+            f"Severity: {round(sev*100)}% | "
+            f"Treatment: {de}/{td if td else '?'} days"
+        )
+
+    if not lines:
+        return jsonify({"insights": "<p class='md-p'>No body-map data found yet. Ask Cura about a prescription or symptoms to begin tracking.</p>"})
+
+    summary = "\n".join(lines)
+
+    try:
+        html = call_gemini_for_tracking_insights(summary)
+    except Exception as exc:
+        app.logger.error(f"[/tracking-insights] error: {exc}", exc_info=True)
+        html = "<p class='md-p'>Could not generate insights at this time. Please try again.</p>"
+
+    return jsonify({"insights": html})
 
 
 # =============================================================
