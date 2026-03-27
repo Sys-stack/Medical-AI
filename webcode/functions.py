@@ -12,7 +12,8 @@ from google.genai import types
 API_KEYS = [
     os.environ.get("GEMINI_API_KEY"),
     os.environ.get("GEMINI_API_KEY_1"),
-    os.environ.get("GEMINI_API_KEY_2")
+    os.environ.get("GEMINI_API_KEY_2"),
+    os.environ.get("GEMINI_API_KEY_3")
 ]
 
 OPENFDA_API_KEY = os.environ.get("OPENFDA_API_KEY")
