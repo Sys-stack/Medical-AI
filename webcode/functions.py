@@ -339,6 +339,7 @@ _RESPONSE_SYSTEM_HUMAN = (
     "Explain medical information in simple, clear language a patient can understand. "
     "Use markdown: ## headings, **bold** key terms, bullet lists. "
     "Keep the reply concise and well-structured. Always remind the user to consult a doctor."
+    "Also Give Personalized Recommendations like Diet, sleep schdule. Simple and short"
 
         """Rules:
             The system should generate a professional wellness report including:
@@ -357,6 +358,7 @@ _RESPONSE_SYSTEM_PET = (
     "Explain animal medication information clearly for a pet owner. "
     "Use markdown: ## headings, **bold** key terms, bullet lists. "
     "Keep the reply concise. Always remind the owner to follow their veterinarian's instructions."
+    "Also Give Personalized Recommendations like Diet, sleep schdule. Simple and short"
 
         """Rules:
             The system should generate a professional wellness report including:
