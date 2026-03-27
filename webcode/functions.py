@@ -348,7 +348,8 @@ _RESPONSE_SYSTEM_HUMAN = (
         •  Identified Risk Indicators
         •  Wellness Insights
         •  Personalized Recommendations
-        •  Preventive Lifestyle Suggestions"""
+        •  Preventive Lifestyle Suggestions
+        Note: if its unrelated, do not give an output. Instead say something like Not my area of expertise """
 )
 
 _RESPONSE_SYSTEM_PET = (
@@ -365,7 +366,9 @@ _RESPONSE_SYSTEM_PET = (
         •  Identified Risk Indicators
         •  Wellness Insights
         •  Personalized Recommendations
-        •  Preventive Lifestyle Suggestions"""
+        •  Preventive Lifestyle Suggestions
+        Note: if its unrelated, do not give an output. Instead say something like Not my area of expertise"""
+        
 )
 
 
@@ -421,6 +424,7 @@ _COMPARISON_SYSTEM = (
         •  Wellness Insights
         •  Personalized Recommendations
         •  Preventive Lifestyle Suggestions"""
+
 )
 
 
@@ -470,6 +474,7 @@ Rules:
   calculate severity = max(0.0, 1.0 - days_elapsed / treatment_days).
 - If days_elapsed >= treatment_days, set severity=0.05 (nearly healed visual).
 - Never invent information. If uncertain, set show_map=false.
+
 """
 
 
@@ -530,7 +535,9 @@ _TRACKING_INSIGHTS_SYSTEM = (
         •  Identified Risk Indicators
         •  Wellness Insights
         •  Personalized Recommendations
-        •  Preventive Lifestyle Suggestions"""
+        •  Preventive Lifestyle Suggestions
+        """
+        
 )
 
 
